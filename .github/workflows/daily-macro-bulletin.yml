@@ -20,7 +20,7 @@ on:
       report_depth:
         description: "Makro Bulten derinligi"
         required: false
-        default: "Orta"
+        default: "Derin"
         type: choice
         options:
           - Kisa
