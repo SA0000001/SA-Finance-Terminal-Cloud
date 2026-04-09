@@ -1,0 +1,116 @@
+name: Daily Macro Bulten
+
+on:
+  schedule:
+    # 16:30 Istanbul (UTC+3) = 13:30 UTC
+    - cron: "30 13 * * *"
+    # 22:45 Istanbul (UTC+3) = 19:45 UTC
+    - cron: "45 19 * * *"
+
+  workflow_dispatch:
+    inputs:
+      slot:
+        description: "Bulten slotu"
+        required: false
+        default: "2245"
+        type: choice
+        options:
+          - "1630"
+          - "2245"
+      report_depth:
+        description: "Makro Bulten derinligi"
+        required: false
+        default: "Orta"
+        type: choice
+        options:
+          - Kisa
+          - Orta
+          - Derin
+      openrouter_model:
+        description: "OpenRouter modeli"
+        required: false
+        default: "google/gemini-2.5-flash"
+        type: string
+
+jobs:
+  send-bulletin:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write   # raporu repoya commit edebilmek için
+    env:
+      OPENROUTER_API_KEY:  ${{ secrets.OPENROUTER_API_KEY }}
+      TELEGRAM_TOKEN:      ${{ secrets.TELEGRAM_TOKEN }}
+      TELEGRAM_CHAT_ID:    ${{ secrets.TELEGRAM_CHAT_ID }}
+      FRED_API_KEY:        ${{ secrets.FRED_API_KEY }}
+      REPORT_DEPTH:        ${{ github.event.inputs.report_depth || 'Derin' }}
+      OPENROUTER_MODEL:    ${{ github.event.inputs.openrouter_model || 'google/gemini-2.5-flash' }}
+      TZ: Europe/Istanbul
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Commit için kimlik bilgisi
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # Hangi slot olduğunu otomatik belirle
+      # workflow_dispatch'ten geliyorsa input kullan
+      # schedule'dan geliyorsa saate göre karar ver
+      - name: Determine bulletin slot
+        id: slot
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            SLOT="${{ github.event.inputs.slot || '2245' }}"
+          else
+            # UTC saatine göre slot belirle
+            HOUR=$(date -u +%H)
+            MINUTE=$(date -u +%M)
+            TIME="${HOUR}${MINUTE}"
+            # 13:30 UTC → 1630 slot
+            # 19:45 UTC → 2245 slot
+            if [ "$HOUR" -le "14" ]; then
+              SLOT="1630"
+            else
+              SLOT="2245"
+            fi
+          fi
+          echo "slot=$SLOT" >> $GITHUB_OUTPUT
+          echo "Slot belirlendi: $SLOT"
+
+      - name: Send Telegram Macro Bulten
+        env:
+          BULLETIN_SLOT: ${{ steps.slot.outputs.slot }}
+        run: python notify.py
+
+      # Üretilen rapor JSON'ını repoya commit et
+      - name: Commit report to repository
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # reports/ dizinini git takibine al
+          git add reports/ || true
+
+          # Değişiklik varsa commit et
+          if git diff --staged --quiet; then
+            echo "Commit edilecek degisiklik yok."
+          else
+            SLOT="${{ steps.slot.outputs.slot }}"
+            DATE=$(date +'%Y-%m-%d %H:%M TRT')
+            git commit -m "report: ${SLOT} bulteni ${DATE}"
+            git push
+            echo "Rapor repoya push edildi."
+          fi

@@ -1,0 +1,6 @@
+".env"
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+pytest-cache-files-*/
+.local_state/

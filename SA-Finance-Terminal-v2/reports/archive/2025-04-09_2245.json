@@ -1,0 +1,26 @@
+{
+  "slot": "2245",
+  "timestamp": "2025-04-09T22:45:00+03:00",
+  "date": "2025-04-09",
+  "time_label": "22:45",
+  "regime": {
+    "overlay": "Risk-On",
+    "score": "65",
+    "dominant_driver": "Liquidity",
+    "bias": "Bullish",
+    "fragility": "Moderate",
+    "confidence": "72"
+  },
+  "market": {
+    "btc_price": "85000",
+    "btc_change": "+2.1%",
+    "support": "83000",
+    "resistance": "88000"
+  },
+  "report": {
+    "terminal_report": "Test raporu icerik.",
+    "x_lead": "Test lead.",
+    "x_thread": "Test thread."
+  },
+  "fallback_used": false
+}
