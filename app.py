@@ -695,18 +695,17 @@ def render_decision_bar(analytics: dict) -> None:
     if not verdict:
         return
 
-    v_color  = verdict.get("color", "warning")
-    v_text   = verdict.get("verdict", "—")
-    v_en     = verdict.get("verdict_en", "")
-    v_action = verdict.get("action", "")
+    v_color   = verdict.get("color", "warning")
+    v_text    = verdict.get("verdict", "—")
+    v_en      = verdict.get("verdict_en", "")
+    v_action  = verdict.get("action", "")
     v_summary = verdict.get("summary", "")
-    decisive = verdict.get("decisive_factors", [])
-    mqs_s    = mqs.get("score", 0)
-    ews_s    = ews.get("score", 0)
-    mqs_lbl  = mqs.get("label", "")
-    ews_lbl  = ews.get("label", "")
+    decisive  = verdict.get("decisive_factors", [])
+    mqs_s     = mqs.get("score", 0)
+    ews_s     = ews.get("score", 0)
+    mqs_lbl   = mqs.get("label", "")
+    ews_lbl   = ews.get("label", "")
 
-    # Renk token
     color_map = {
         "positive": ("var(--positive)", "var(--positive-dim)", "rgba(50,217,140,0.32)"),
         "warning":  ("var(--warning)",  "var(--warning-dim)",  "rgba(240,192,80,0.32)"),
@@ -714,117 +713,116 @@ def render_decision_bar(analytics: dict) -> None:
     }
     c_text, c_bg, c_border = color_map.get(v_color, color_map["warning"])
 
-    # MQS bileşen barları
-    def comp_bars(components):
-        bars = ""
+    def bar_color(s: int) -> str:
+        if s >= 62: return "var(--positive)"
+        if s >= 45: return "var(--warning)"
+        return "var(--negative)"
+
+    def comp_bars_html(components: list) -> str:
+        parts = []
         for c in components:
-            s = c["score"]
-            bar_color = (
-                "var(--positive)" if s >= 62
-                else "var(--warning)" if s >= 45
-                else "var(--negative)"
+            s   = c["score"]
+            lbl = esc(c["label"])
+            bc  = bar_color(s)
+            parts.append(
+                "<div style='display:flex;align-items:center;gap:8px;margin-bottom:5px'>"
+                "<span style='min-width:110px;font-size:0.72rem;color:var(--text-muted)'>" + lbl + "</span>"
+                "<div style='flex:1;height:4px;border-radius:99px;background:rgba(255,255,255,0.06)'>"
+                "<div style='width:" + str(s) + "%;height:100%;border-radius:99px;background:" + bc + "'></div>"
+                "</div>"
+                "<span style='min-width:36px;text-align:right;font-family:var(--font-mono);font-size:0.7rem;color:var(--text-muted)'>" + str(s) + "</span>"
+                "</div>"
             )
-            bars += (
-                f'<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">' 
-                f'<span style="min-width:110px;font-size:0.72rem;color:var(--text-muted)">{esc(c["label"])}</span>'
-                f'<div style="flex:1;height:4px;border-radius:99px;background:rgba(255,255,255,0.06)">' 
-                f'<div style="width:{s}%;height:100%;border-radius:99px;background:{bar_color}"></div></div>'
-                f'<span style="min-width:36px;text-align:right;font-family:var(--font-mono);font-size:0.7rem;color:var(--text-muted)">{s}</span>'
-                f'</div>'
-            )
-        return bars
+        return "".join(parts)
 
     decisive_html = "".join(
-        f'<span style="display:inline-flex;align-items:center;padding:4px 9px;border-radius:99px;'
-        f'border:1px solid var(--border);background:rgba(255,255,255,0.025);'
-        f'font-family:var(--font-mono);font-size:0.68rem;color:var(--text-muted);margin-right:6px">{esc(d)}</span>'
+        "<span style='display:inline-flex;align-items:center;padding:4px 9px;border-radius:99px;"
+        "border:1px solid var(--border);background:rgba(255,255,255,0.025);"
+        "font-family:var(--font-mono);font-size:0.68rem;color:var(--text-muted);margin-right:6px'>"
+        + esc(d) + "</span>"
         for d in decisive
     )
 
-    st.markdown(
-        f'''
-        <div style="
-            display:grid;
-            grid-template-columns: auto 1fr 1fr auto;
-            gap:16px;
-            align-items:stretch;
-            padding:18px 22px;
-            margin:0 0 14px 0;
-            border-radius:var(--r-lg);
-            border:1px solid {c_border};
-            background:linear-gradient(135deg, rgba(8,15,26,0.97) 0%, rgba(10,20,34,0.97) 100%);
-            box-shadow: 0 0 0 1px {c_border}, var(--shadow-md);
-        ">
-            <!-- KARAR BLOĞU -->
-            <div style="display:flex;flex-direction:column;justify-content:center;
-                        padding:12px 20px;border-radius:var(--r-md);
-                        background:{c_bg};border:1px solid {c_border};
-                        min-width:120px;text-align:center">
-                <div style="font-family:var(--font-mono);font-size:0.64rem;letter-spacing:0.2em;
-                             text-transform:uppercase;color:{c_text};margin-bottom:6px">Karar</div>
-                <div style="font-size:2.1rem;font-weight:900;letter-spacing:-0.05em;color:{c_text};
-                             line-height:1">{esc(v_text)}</div>
-                <div style="font-family:var(--font-mono);font-size:0.66rem;color:{c_text};
-                             opacity:0.7;margin-top:4px;letter-spacing:0.06em">{esc(v_en)}</div>
-            </div>
+    mqs_bars = comp_bars_html(mqs.get("components", []))
+    ews_bars = comp_bars_html(ews.get("components", []))
 
-            <!-- MQS BLOĞU -->
-            <div style="padding:12px 14px;border-radius:var(--r-md);
-                        border:1px solid var(--border);background:rgba(255,255,255,0.022)">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-                    <div>
-                        <div style="font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.16em;
-                                     text-transform:uppercase;color:var(--accent)">MQS</div>
-                        <div style="font-size:0.76rem;color:var(--text-muted);margin-top:1px">Market Quality Score</div>
-                    </div>
-                    <div style="text-align:right">
-                        <div style="font-size:1.6rem;font-weight:800;letter-spacing:-0.06em;color:#fff;line-height:1">
-                            {mqs_s}</div>
-                        <div style="font-family:var(--font-mono);font-size:0.66rem;color:var(--text-muted);
-                                     letter-spacing:0.04em">/100 · {esc(mqs_lbl)}</div>
-                    </div>
-                </div>
-                {comp_bars(mqs.get("components", []))}
-            </div>
+    html_parts = [
+        "<div style='display:grid;grid-template-columns:auto 1fr 1fr auto;gap:16px;"
+        "align-items:stretch;padding:18px 22px;margin:0 0 14px 0;"
+        "border-radius:var(--r-lg);border:1px solid " + c_border + ";"
+        "background:linear-gradient(135deg,rgba(8,15,26,0.97) 0%,rgba(10,20,34,0.97) 100%);"
+        "box-shadow:0 0 0 1px " + c_border + ",var(--shadow-md)'>",
 
-            <!-- EWS BLOĞU -->
-            <div style="padding:12px 14px;border-radius:var(--r-md);
-                        border:1px solid var(--border);background:rgba(255,255,255,0.022)">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-                    <div>
-                        <div style="font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.16em;
-                                     text-transform:uppercase;color:var(--accent)">EWS</div>
-                        <div style="font-size:0.76rem;color:var(--text-muted);margin-top:1px">Execution Window Score</div>
-                    </div>
-                    <div style="text-align:right">
-                        <div style="font-size:1.6rem;font-weight:800;letter-spacing:-0.06em;color:#fff;line-height:1">
-                            {ews_s}</div>
-                        <div style="font-family:var(--font-mono);font-size:0.66rem;color:var(--text-muted);
-                                     letter-spacing:0.04em">/100 · {esc(ews_lbl)}</div>
-                    </div>
-                </div>
-                {comp_bars(ews.get("components", []))}
-            </div>
+        # Karar bloğu
+        "<div style='display:flex;flex-direction:column;justify-content:center;"
+        "padding:12px 20px;border-radius:var(--r-md);"
+        "background:" + c_bg + ";border:1px solid " + c_border + ";"
+        "min-width:120px;text-align:center'>"
+        "<div style='font-family:var(--font-mono);font-size:0.64rem;letter-spacing:0.2em;"
+        "text-transform:uppercase;color:" + c_text + ";margin-bottom:6px'>Karar</div>"
+        "<div style='font-size:2.1rem;font-weight:900;letter-spacing:-0.05em;color:" + c_text + ";line-height:1'>"
+        + esc(v_text) + "</div>"
+        "<div style='font-family:var(--font-mono);font-size:0.66rem;color:" + c_text + ";"
+        "opacity:0.7;margin-top:4px;letter-spacing:0.06em'>" + esc(v_en) + "</div>"
+        "</div>",
 
-            <!-- ÖZET / AKSİYON -->
-            <div style="display:flex;flex-direction:column;justify-content:space-between;
-                        padding:12px 14px;border-radius:var(--r-md);
-                        border:1px solid var(--border);background:rgba(255,255,255,0.022);
-                        min-width:200px;max-width:260px">
-                <div>
-                    <div style="font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.12em;
-                                 text-transform:uppercase;color:var(--text-muted);margin-bottom:6px">Aksiyon</div>
-                    <div style="font-size:0.82rem;font-weight:600;color:var(--text-primary);
-                                 line-height:1.5">{esc(v_action)}</div>
-                    <div style="font-size:0.76rem;color:var(--text-muted);line-height:1.55;
-                                 margin-top:8px">{esc(v_summary)}</div>
-                </div>
-                <div style="margin-top:10px">{decisive_html}</div>
-            </div>
-        </div>
-        ''',
-        unsafe_allow_html=True,
-    )
+        # MQS bloğu
+        "<div style='padding:12px 14px;border-radius:var(--r-md);"
+        "border:1px solid var(--border);background:rgba(255,255,255,0.022)'>"
+        "<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:10px'>"
+        "<div>"
+        "<div style='font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.16em;"
+        "text-transform:uppercase;color:var(--accent)'>MQS</div>"
+        "<div style='font-size:0.76rem;color:var(--text-muted);margin-top:1px'>Market Quality Score</div>"
+        "</div>"
+        "<div style='text-align:right'>"
+        "<div style='font-size:1.6rem;font-weight:800;letter-spacing:-0.06em;color:#fff;line-height:1'>"
+        + str(mqs_s) + "</div>"
+        "<div style='font-family:var(--font-mono);font-size:0.66rem;color:var(--text-muted);"
+        "letter-spacing:0.04em'>/100 · " + esc(mqs_lbl) + "</div>"
+        "</div></div>"
+        + mqs_bars +
+        "</div>",
+
+        # EWS bloğu
+        "<div style='padding:12px 14px;border-radius:var(--r-md);"
+        "border:1px solid var(--border);background:rgba(255,255,255,0.022)'>"
+        "<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:10px'>"
+        "<div>"
+        "<div style='font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.16em;"
+        "text-transform:uppercase;color:var(--accent)'>EWS</div>"
+        "<div style='font-size:0.76rem;color:var(--text-muted);margin-top:1px'>Execution Window Score</div>"
+        "</div>"
+        "<div style='text-align:right'>"
+        "<div style='font-size:1.6rem;font-weight:800;letter-spacing:-0.06em;color:#fff;line-height:1'>"
+        + str(ews_s) + "</div>"
+        "<div style='font-family:var(--font-mono);font-size:0.66rem;color:var(--text-muted);"
+        "letter-spacing:0.04em'>/100 · " + esc(ews_lbl) + "</div>"
+        "</div></div>"
+        + ews_bars +
+        "</div>",
+
+        # Aksiyon bloğu
+        "<div style='display:flex;flex-direction:column;justify-content:space-between;"
+        "padding:12px 14px;border-radius:var(--r-md);"
+        "border:1px solid var(--border);background:rgba(255,255,255,0.022);"
+        "min-width:200px;max-width:260px'>"
+        "<div>"
+        "<div style='font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.12em;"
+        "text-transform:uppercase;color:var(--text-muted);margin-bottom:6px'>Aksiyon</div>"
+        "<div style='font-size:0.82rem;font-weight:600;color:var(--text-primary);line-height:1.5'>"
+        + esc(v_action) + "</div>"
+        "<div style='font-size:0.76rem;color:var(--text-muted);line-height:1.55;margin-top:8px'>"
+        + esc(v_summary) + "</div>"
+        "</div>"
+        "<div style='margin-top:10px'>" + decisive_html + "</div>"
+        "</div>",
+
+        "</div>",  # outer grid
+    ]
+
+    st.markdown("".join(html_parts), unsafe_allow_html=True)
+
 
 
 def render_overview_tab(data, brief, analytics, alerts, health_summary):
