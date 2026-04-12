@@ -1014,9 +1014,10 @@ def markdown_to_basic_pdf_bytes(markdown_text: str) -> bytes:
 def build_analytics_payload(data: dict) -> dict:
     scores = build_regime_scores(data)
     return {
-        "scores":   scores,
+        "scores":    scores,
         "scenarios": build_scenario_matrix(data),
-        "decision": build_decision_verdict(data, scores),
+        "decision":  build_decision_verdict(data, scores),
+        "risk_on_off": build_risk_on_off(data),
     }
 
 
@@ -1310,4 +1311,299 @@ def build_decision_verdict(data: dict, scores: dict) -> dict:
         "verdict": verdict,
         "mqs":     mqs,
         "ews":     ews,
+    }
+
+
+# ─── RISK ON/OFF INDICATOR ────────────────────────────────────────────────────
+#
+# 4 bölgesel blok + makro stres katmanı:
+#   ASIA     — Nikkei, HSI  (ağırlık %18)
+#   EUROPE   — DAX, FTSE    (ağırlık %16)
+#   US       — SP500, NASDAQ (ağırlık %18)
+#   CRYPTO   — BTC, ETH     (ağırlık %18)
+#   MACRO STRESS — DXY, VIX, US10Y, OIL, GOLD (ağırlık %30)
+#
+# Her bölge için:
+#   - Bileşik skor (ağırlıklı değişim ortalaması)
+#   - Breadth (kaç tanesi pozitif)
+#   - Agreement (breadth / toplam, %)
+#   - Sinyal: RISK ON / NEUTRAL / RISK OFF
+#
+# Global skor: bölge skorlarının ağırlıklı ortalaması
+# Sync Q:    bölgeler arası uyum (agreement)
+# Agree Q:   tüm varlıklar içinde pozitif olanların oranı
+#
+
+def _pct(value) -> float | None:
+    """'%1.23' veya '1.23%' veya '1.23' → float veya None"""
+    v = parse_number(value)
+    return v
+
+
+def _weighted_change_score(changes: list[float | None], weights: list[float]) -> float:
+    """Ağırlıklı değişim ortalaması → normalize edilmiş 0-100 skor"""
+    total_w = 0.0
+    total_s = 0.0
+    for c, w in zip(changes, weights):
+        if c is None:
+            continue
+        # +/-5% aralığını 0-100'e normalize et
+        normalized = max(0.0, min(100.0, (c + 5.0) / 10.0 * 100.0))
+        total_s += normalized * w
+        total_w += w
+    if total_w == 0:
+        return 50.0
+    return total_s / total_w
+
+
+def _breadth(changes: list[float | None]) -> tuple[int, int]:
+    """(pozitif_sayısı, toplam_geçerli_sayısı)"""
+    valid = [c for c in changes if c is not None]
+    pos   = sum(1 for c in valid if c > 0)
+    return pos, len(valid)
+
+
+def _region_signal(score: float, breadth_pct: float) -> str:
+    if score >= 60 and breadth_pct >= 60:
+        return "RISK ON"
+    if score <= 40 or breadth_pct <= 35:
+        return "RISK OFF"
+    return "NEUTRAL"
+
+
+def _region_color(signal: str) -> str:
+    return {"RISK ON": "positive", "NEUTRAL": "warning", "RISK OFF": "negative"}.get(signal, "warning")
+
+
+def _build_region(
+    name: str,
+    assets: list[tuple[str, str, float]],   # (label, change_key, weight)
+    data: dict,
+    region_weight: float,
+) -> dict:
+    changes = [_pct(data.get(ck)) for _, ck, _ in assets]
+    weights = [w for _, _, w in assets]
+    pos, total = _breadth(changes)
+    brd_pct    = (pos / total * 100) if total else 0.0
+    score      = _weighted_change_score(changes, weights)
+    signal     = _region_signal(score, brd_pct)
+
+    # Değişim değerlerini gösterim için formatla
+    asset_rows = []
+    for (lbl, ck, _), chg in zip(assets, changes):
+        asset_rows.append({
+            "label":  lbl,
+            "key":    ck,
+            "change": f"{chg:+.2f}%" if chg is not None else "-",
+            "value":  chg,
+            "pos":    chg is not None and chg > 0,
+        })
+
+    return {
+        "name":          name,
+        "score":         round(score, 1),
+        "weight":        region_weight,
+        "signal":        signal,
+        "color":         _region_color(signal),
+        "breadth_pos":   pos,
+        "breadth_total": total,
+        "breadth_pct":   round(brd_pct, 0),
+        "agree_pct":     round(brd_pct, 0),
+        "assets":        asset_rows,
+        "coverage":      f"{total}/{len(assets)}",
+    }
+
+
+def _build_macro_stress_block(data: dict) -> dict:
+    """
+    DXY, VIX, US10Y → stres göstergeleri (yüksek = risk-off sinyali → ters çevrilir)
+    OIL, GOLD → karışık sinyal (her ikisi de izlenir)
+    """
+    dxy_c   = _pct(data.get("DXY_C"))
+    vix_c   = _pct(data.get("VIX_C"))
+    us10y_c = _pct(data.get("US10Y_C"))
+    oil_c   = _pct(data.get("OIL_C"))
+    gold_c  = _pct(data.get("GOLD_C"))
+
+    # Stres bileşenleri: DXY↑ VIX↑ US10Y↑ = risk-off → ters normalize
+    stress_changes  = [dxy_c, vix_c, us10y_c]
+    stress_weights  = [0.25, 0.30, 0.20]
+    stress_score_raw = _weighted_change_score(stress_changes, stress_weights)
+    # Ters çevir: yüksek stres = düşük risk-on skoru
+    stress_score = 100.0 - stress_score_raw
+
+    # Emtia (OIL↑ + GOLD↑ birlikte → risk-off, ayrı ayrı karma sinyal)
+    commodity_score = 50.0
+    if oil_c is not None and gold_c is not None:
+        if oil_c > 0 and gold_c > 0:
+            commodity_score = 35.0  # her ikisi yukarı → risk-off ağırlıklı
+        elif oil_c > 0 and gold_c < 0:
+            commodity_score = 55.0
+        elif oil_c < 0 and gold_c < 0:
+            commodity_score = 65.0  # her ikisi aşağı → risk-on ağırlıklı
+        else:
+            commodity_score = 50.0
+
+    final_score = stress_score * 0.75 + commodity_score * 0.25
+
+    assets = [
+        {"label": "DXY",   "key": "DXY_C",   "change": f"{dxy_c:+.2f}%"   if dxy_c   is not None else "-", "value": dxy_c,   "pos": dxy_c   is not None and dxy_c   < 0},  # DXY düşüşü risk-on
+        {"label": "VIX",   "key": "VIX_C",   "change": f"{vix_c:+.2f}%"   if vix_c   is not None else "-", "value": vix_c,   "pos": vix_c   is not None and vix_c   < 0},  # VIX düşüşü risk-on
+        {"label": "US10Y", "key": "US10Y_C", "change": f"{us10y_c:+.2f}%" if us10y_c is not None else "-", "value": us10y_c, "pos": us10y_c is not None and us10y_c < 0},  # yield düşüşü risk-on
+        {"label": "OIL",   "key": "OIL_C",   "change": f"{oil_c:+.2f}%"   if oil_c   is not None else "-", "value": oil_c,   "pos": oil_c   is not None and oil_c   > 0},
+        {"label": "GOLD",  "key": "GOLD_C",  "change": f"{gold_c:+.2f}%"  if gold_c  is not None else "-", "value": gold_c,  "pos": gold_c  is not None and gold_c  < 0},  # altın düşüşü risk-on
+    ]
+
+    signal = _region_signal(final_score, 50.0)
+    return {
+        "name":    "MACRO STRESS",
+        "score":   round(final_score, 1),
+        "weight":  0.30,
+        "signal":  signal,
+        "color":   _region_color(signal),
+        "assets":  assets,
+        "dxy":     f"{dxy_c:+.2f}%"   if dxy_c   is not None else "-",
+        "vix":     f"{vix_c:+.2f}%"   if vix_c   is not None else "-",
+        "us10y":   f"{us10y_c:+.2f}%" if us10y_c is not None else "-",
+        "oil":     f"{oil_c:+.2f}%"   if oil_c   is not None else "-",
+        "gold":    f"{gold_c:+.2f}%"  if gold_c  is not None else "-",
+        "coverage": f"{sum(1 for v in [dxy_c,vix_c,us10y_c,oil_c,gold_c] if v is not None)}/5",
+    }
+
+
+def build_risk_on_off(data: dict) -> dict:
+    """
+    Global Risk On/Off göstergesi.
+    Tüm bölgelerin ağırlıklı kompozit skoru.
+    
+    Döner:
+      global_score   — 0-100 composite
+      global_signal  — RISK ON / NEUTRAL / RISK OFF
+      strict_score   — sadece yüksek güven bölgelerinden
+      live_score     — tüm mevcut veriden
+      sync_q         — bölgeler arası uyum skoru (0-100)
+      agree_q        — tüm varlıklar içinde pozitif % (0-100)
+      regions        — 4 bölgesel blok
+      macro_stress   — makro stres katmanı
+      drivers        — en güçlü 2 sürücü
+      drags          — en güçlü 2 frenleme
+      coverage       — kaç/toplam varlık verisi geldi
+    """
+    # ── Bölgeler ──────────────────────────────────────────────────────────────
+    asia = _build_region("ASIA", [
+        ("N225",  "NIKKEI_C", 0.40),
+        ("HSI",   "HSI_C",    0.35),
+        ("SHCOMP","SP500_C",  0.25),  # SHCOMP yok, proxy olarak SP500_C kullan ama düşük ağırlık
+    ], data, region_weight=0.18)
+
+    europe = _build_region("EUROPE", [
+        ("DAX",  "DAX_C",  0.50),
+        ("FTSE", "FTSE_C", 0.50),
+    ], data, region_weight=0.16)
+
+    us = _build_region("US FUTURES", [
+        ("SP500",  "SP500_C",  0.50),
+        ("NASDAQ", "NASDAQ_C", 0.50),
+    ], data, region_weight=0.18)
+
+    # BTC ve ETH değişimleri
+    btc_c = _pct(data.get("BTC_C"))
+    eth_c_raw = data.get("ETH_C")
+    # ETH değişimi: ETH_P yoksa BTC ile birlikte gelmeyebilir, BTC_C proxy kullan
+    eth_c = _pct(eth_c_raw) if eth_c_raw and eth_c_raw != "-" else (btc_c * 0.9 if btc_c else None)
+
+    crypto = _build_region("CRYPTO", [
+        ("BTC", "BTC_C",  0.55),
+        ("ETH", "ETH_C",  0.45),
+    ], data, region_weight=0.18)
+
+    macro_stress = _build_macro_stress_block(data)
+
+    # ── Global skor ───────────────────────────────────────────────────────────
+    regions = [asia, europe, us, crypto]
+    global_score_raw = sum(
+        r["score"] * r["weight"] for r in regions
+    ) + macro_stress["score"] * macro_stress["weight"]
+
+    total_weight = sum(r["weight"] for r in regions) + macro_stress["weight"]
+    global_score = clamp_score(global_score_raw / total_weight * (total_weight / 1.0))
+
+    # Strict score: sadece tam coverage olan bölgeler
+    strict_regions = [r for r in regions if r["breadth_total"] >= 2]
+    if strict_regions:
+        strict_raw = sum(r["score"] * r["weight"] for r in strict_regions)
+        strict_w   = sum(r["weight"] for r in strict_regions)
+        strict_score = clamp_score((strict_raw / strict_w) * 0.7 + macro_stress["score"] * 0.3)
+    else:
+        strict_score = global_score
+
+    # ── Sync Q: bölgeler arası uyum ──────────────────────────────────────────
+    # Bölge sinyalleri ne kadar birbirine benziyor?
+    signals = [r["signal"] for r in regions]
+    risk_on_count  = signals.count("RISK ON")
+    risk_off_count = signals.count("RISK OFF")
+    neutral_count  = signals.count("NEUTRAL")
+    dominant       = max(risk_on_count, risk_off_count, neutral_count)
+    sync_q         = clamp_score(dominant / len(signals) * 100)
+
+    # ── Agree Q: tüm varlıklarda pozitif % ───────────────────────────────────
+    all_assets = []
+    for r in regions:
+        all_assets.extend(r["assets"])
+    all_assets.extend(macro_stress["assets"])
+    total_assets   = len([a for a in all_assets if a["value"] is not None])
+    positive_assets = len([a for a in all_assets if a["pos"] and a["value"] is not None])
+    agree_q = clamp_score((positive_assets / total_assets * 100) if total_assets else 50)
+
+    # ── Global sinyal ─────────────────────────────────────────────────────────
+    if global_score >= 60 and sync_q >= 55:
+        global_signal = "RISK ON"
+        global_color  = "positive"
+    elif global_score <= 40 or (risk_off_count >= 2 and global_score < 50):
+        global_signal = "RISK OFF"
+        global_color  = "negative"
+    else:
+        global_signal = "NEUTRAL"
+        global_color  = "warning"
+
+    # Strict signal
+    if strict_score >= 62:
+        strict_signal = "RISK ON"
+        strict_color  = "positive"
+    elif strict_score <= 38:
+        strict_signal = "RISK OFF"
+        strict_color  = "negative"
+    else:
+        strict_signal = "NEUTRAL"
+        strict_color  = "warning"
+
+    # ── Sürücüler ve frenleme ─────────────────────────────────────────────────
+    scored_assets = sorted(
+        [a for a in all_assets if a["value"] is not None],
+        key=lambda a: a["value"] if a["value"] else 0,
+        reverse=True,
+    )
+    drivers = [{"label": a["label"], "change": a["change"]} for a in scored_assets[:3] if a["value"] and a["value"] > 0]
+    drags   = [{"label": a["label"], "change": a["change"]} for a in reversed(scored_assets) if a["value"] and a["value"] < 0][:3]
+
+    coverage = f"{total_assets}/{len(all_assets)}"
+
+    return {
+        "global_score":  global_score,
+        "global_signal": global_signal,
+        "global_color":  global_color,
+        "strict_score":  strict_score,
+        "strict_signal": strict_signal,
+        "strict_color":  strict_color,
+        "live_score":    global_score,
+        "sync_q":        sync_q,
+        "agree_q":       agree_q,
+        "regions":       regions,
+        "macro_stress":  macro_stress,
+        "drivers":       drivers[:2],
+        "drags":         drags[:2],
+        "coverage":      coverage,
+        "risk_on_count":  risk_on_count,
+        "neutral_count":  neutral_count,
+        "risk_off_count": risk_off_count,
     }
