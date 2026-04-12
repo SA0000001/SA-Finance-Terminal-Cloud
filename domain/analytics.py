@@ -1012,7 +1012,302 @@ def markdown_to_basic_pdf_bytes(markdown_text: str) -> bytes:
 
 
 def build_analytics_payload(data: dict) -> dict:
+    scores = build_regime_scores(data)
     return {
-        "scores": build_regime_scores(data),
+        "scores":   scores,
         "scenarios": build_scenario_matrix(data),
+        "decision": build_decision_verdict(data, scores),
+    }
+
+
+# ─── DECISION VERDICT (MQS + EWS) ────────────────────────────────────────────
+#
+# MQS — Market Quality Score
+#   "Piyasa ortamı işlem için elverişli mi?"
+#   Mevcut 4 faktörden türetilir; ağırlıklar biraz farklı yorumlanır.
+#
+# EWS — Execution Window Score
+#   "Şu an işlem zamanlaması uygun mu?"
+#   Kırılmalar tutunuyor mu, geri çekilmeler fırsat mı?
+#   Order book + volatility + momentum odaklı.
+#
+# Verdict: EVET / DİKKAT / HAYIR
+#
+
+def _build_mqs(scores: dict) -> dict:
+    """
+    Market Quality Score — piyasa ortamının işlem için ne kadar elverişli olduğunu ölçer.
+    Mevcut faktörlerin ağırlıklı kompoziti; fragility cezası uygulanır.
+    
+    Bileşenler:
+      Liquidity    %30  — para akışı ve dolar baskısı
+      Volatility   %25  — VIX ve BTC volatilitesi
+      Positioning  %20  — crowding ve dengesiz pozisyonlar
+      Participation %25 — macro + crypto breadth uyumu
+    """
+    factors = {f["key"]: f for f in scores["factors"]}
+    
+    liq   = factors["liquidity"]["score"]
+    vol   = factors["volatility"]["score"]
+    pos   = factors["positioning"]["score"]
+    part  = factors["participation"]["score"]
+    frag  = scores["fragility"]["score"]
+    
+    base = (
+        liq  * 0.30 +
+        vol  * 0.25 +
+        pos  * 0.20 +
+        part * 0.25
+    )
+    
+    # Fragility cezası: fragility 35 üstünde her puan %0.22 düşürür
+    frag_penalty = max(0.0, (frag - 35) * 0.22)
+    
+    # Alignment gap cezası
+    m_bread = scores["participation"]["subfactors"]["macro"]["score"]
+    c_bread = scores["participation"]["subfactors"]["crypto"]["score"]
+    gap_penalty = max(0.0, (abs(m_bread - c_bread) - 10) * 0.25)
+    
+    mqs = clamp_score(base - frag_penalty - gap_penalty)
+    
+    # Bileşen dağılımı (görsel bar için)
+    components = [
+        {"key": "liquidity",    "label": "Liquidity",    "score": liq,  "weight": 30},
+        {"key": "volatility",   "label": "Volatility",   "score": vol,  "weight": 25},
+        {"key": "positioning",  "label": "Positioning",  "score": pos,  "weight": 20},
+        {"key": "participation","label": "Participation","score": part, "weight": 25},
+    ]
+    
+    # En güçlü ve en zayıf bileşen
+    strongest = max(components, key=lambda c: c["score"])
+    weakest   = min(components, key=lambda c: c["score"])
+    
+    if mqs >= 62:
+        label = "Elverişli"
+        color = "positive"
+    elif mqs >= 45:
+        label = "Karışık"
+        color = "warning"
+    else:
+        label = "Elverişsiz"
+        color = "negative"
+    
+    return {
+        "score":      mqs,
+        "label":      label,
+        "color":      color,
+        "components": components,
+        "strongest":  strongest["label"],
+        "weakest":    weakest["label"],
+        "frag_penalty":  round(frag_penalty, 1),
+        "gap_penalty":   round(gap_penalty, 1),
+    }
+
+
+def _build_ews(data: dict, scores: dict) -> dict:
+    """
+    Execution Window Score — şu an işlem zamanlaması uygun mu?
+    Order book, momentum ve volatility hızına bakarak kırılma/geri çekilme
+    kalitesini değerlendirir.
+    
+    Bileşenler:
+      Order book signal  %30  — destek/direnç sağlamlığı
+      Momentum quality   %25  — fiyat-akış uyumu
+      Vol regime         %25  — ani şok riski
+      Positioning room   %20  — squeeze ve crowding alanı
+    """
+    factors = {f["key"]: f for f in scores["factors"]}
+    
+    # Order book kalitesi
+    ob_signal = data.get("ORDERBOOK_SIGNAL", "")
+    ob_score = 55  # varsayılan nötr
+    if isinstance(ob_signal, str):
+        sig_lower = ob_signal.lower()
+        if any(w in sig_lower for w in ["strong buy", "buy", "support"]):
+            ob_score = 78
+        elif any(w in sig_lower for w in ["strong sell", "sell", "resistance"]):
+            ob_score = 28
+        elif any(w in sig_lower for w in ["neutral", "mixed"]):
+            ob_score = 52
+
+    # Momentum kalitesi — fiyat hareketi + taker uyumu
+    btc_change = parse_number(data.get("BTC_C")) or 0.0
+    taker      = parse_number(data.get("Taker")) or 1.0
+    etf_flow   = parse_number(data.get("ETF_FLOW_TOTAL")) or 0.0
+    
+    # Fiyat yönü ile taker ve ETF uyuyor mu?
+    momentum_score = 50
+    if btc_change > 0 and taker > 1.02 and etf_flow > 0:
+        momentum_score = 80
+    elif btc_change > 0 and taker > 1.02:
+        momentum_score = 68
+    elif btc_change < 0 and taker < 0.98 and etf_flow < 0:
+        momentum_score = 22  # güçlü aşağı momentum
+    elif btc_change < 0 and taker < 0.98:
+        momentum_score = 35
+    elif abs(btc_change) < 0.5:
+        momentum_score = 55  # düz, belirsiz
+    
+    # Vol rejimi — ani şok riski
+    vol_score = factors["volatility"]["score"]
+    
+    # Positioning alanı — crowding ne kadar?
+    pos_score = factors["positioning"]["score"]
+    
+    base = (
+        ob_score       * 0.30 +
+        momentum_score * 0.25 +
+        vol_score      * 0.25 +
+        pos_score      * 0.20
+    )
+    
+    ews = clamp_score(base)
+    
+    components = [
+        {"key": "orderbook",  "label": "Order Book",  "score": ob_score,       "weight": 30},
+        {"key": "momentum",   "label": "Momentum",    "score": momentum_score,  "weight": 25},
+        {"key": "volatility", "label": "Vol Regime",  "score": vol_score,       "weight": 25},
+        {"key": "positioning","label": "Positioning Room","score": pos_score,   "weight": 20},
+    ]
+    
+    strongest = max(components, key=lambda c: c["score"])
+    weakest   = min(components, key=lambda c: c["score"])
+    
+    if ews >= 62:
+        label = "Pencere Açık"
+        color = "positive"
+    elif ews >= 45:
+        label = "Dikkatli Ol"
+        color = "warning"
+    else:
+        label = "Pencere Kapalı"
+        color = "negative"
+    
+    # Destek / direnç seviyeleri
+    sup = data.get("Sup_Wall", "-")
+    res = data.get("Res_Wall", "-")
+    
+    return {
+        "score":      ews,
+        "label":      label,
+        "color":      color,
+        "components": components,
+        "strongest":  strongest["label"],
+        "weakest":    weakest["label"],
+        "support":    sup,
+        "resistance": res,
+        "ob_signal":  ob_signal or "-",
+    }
+
+
+def _build_verdict(mqs: dict, ews: dict, scores: dict) -> dict:
+    """
+    EVET / DİKKAT / HAYIR kararını üretir.
+    
+    EVET:    MQS ≥ 60 VE EWS ≥ 58 VE fragility < 65
+    DİKKAT: Yukarıdakilerin bazıları sağlanıyor ama hepsi değil
+    HAYIR:   MQS < 45 VEYA EWS < 40 VEYA fragility ≥ 70
+    """
+    mqs_s  = mqs["score"]
+    ews_s  = ews["score"]
+    frag_s = scores["fragility"]["score"]
+    overall = scores["overall"]
+    
+    # HAYIR koşulları
+    hard_no = (
+        mqs_s < 36 or
+        ews_s < 34 or
+        frag_s >= 72 or
+        overall < 30
+    )
+    
+    # EVET koşulları
+    strong_yes = (
+        mqs_s >= 60 and
+        ews_s >= 58 and
+        frag_s < 58 and
+        overall >= 55
+    )
+    
+    # DİKKAT koşulları — ikisi arasında kalan alan
+    # hard_no değil ve strong_yes değilse otomatik DİKKAT devreye girer
+    # Ek kontrol: en az biri 45+ olmalı
+    at_least_one_ok = mqs_s >= 45 or ews_s >= 45
+    
+    if hard_no and not at_least_one_ok:
+        verdict = "HAYIR"
+        verdict_en = "NO TRADE"
+        color = "negative"
+        summary = "Piyasa ortamı veya işlem penceresi yeni pozisyon için elverişli değil. Kenarda dur, teyit bekle."
+        size_guidance = "0%"
+        action = "Kenarda kal. Mevcut pozisyonları koru, yeni açma."
+    elif hard_no:
+        verdict = "DİKKAT"
+        verdict_en = "SELECTIVE"
+        color = "warning"
+        summary = "Koşullar zayıf. Mevcut açık pozisyonları koru, yeni pozisyon açmaktan kaçın."
+        size_guidance = "0% — yeni pozisyon yok"
+        action = "Yeni pozisyon açma. Mevcut pozisyonlarda stop'ları sıkılaştır."
+    elif strong_yes:
+        verdict = "EVET"
+        verdict_en = "GO"
+        color = "positive"
+        summary = "Piyasa kalitesi ve işlem penceresi uyumlu. Teyitli setup'larda pozisyon alınabilir."
+        # Boyut önerisi: overall ve MQS'e göre
+        if overall >= 70 and mqs_s >= 70:
+            size_guidance = "Tam boyut"
+        else:
+            size_guidance = "Seçici / yarı boyut"
+        action = "Teyitli setup'larda pozisyon alınabilir. Boyut: " + size_guidance
+    else:
+        verdict = "DİKKAT"
+        verdict_en = "SELECTIVE"
+        color = "warning"
+        summary = "Karma sinyal. Sadece en yüksek kaliteli setup'larda, küçük boyutle işlem yapılabilir."
+        size_guidance = "Küçük boyut / seçici"
+        action = "Yalnızca en güçlü teyitlerde, küçük boyutle işlem. Agresif pozisyon alma."
+    
+    # Hangi koşul kararı belirliyor?
+    decisive_factors = []
+    if mqs_s < 45:
+        decisive_factors.append(f"MQS düşük ({mqs_s}/100)")
+    if ews_s < 45:
+        decisive_factors.append(f"EWS düşük ({ews_s}/100)")
+    if frag_s >= 58:
+        decisive_factors.append(f"Fragility yüksek ({frag_s}/100)")
+    if mqs_s >= 60:
+        decisive_factors.append(f"MQS destekleyici ({mqs_s}/100)")
+    if ews_s >= 58:
+        decisive_factors.append(f"EWS pencere açık ({ews_s}/100)")
+    
+    return {
+        "verdict":         verdict,
+        "verdict_en":      verdict_en,
+        "color":           color,
+        "summary":         summary,
+        "action":          action,
+        "size_guidance":   size_guidance,
+        "decisive_factors": decisive_factors[:3],
+        "mqs_score":       mqs_s,
+        "ews_score":       ews_s,
+        "frag_score":      frag_s,
+        "overall":         overall,
+    }
+
+
+def build_decision_verdict(data: dict, scores: dict) -> dict:
+    """
+    Ana giriş noktası. analytics payload'a eklenir.
+    Döner:
+      verdict  — EVET / DİKKAT / HAYIR kararı
+      mqs      — Market Quality Score detayı
+      ews      — Execution Window Score detayı
+    """
+    mqs     = _build_mqs(scores)
+    ews     = _build_ews(data, scores)
+    verdict = _build_verdict(mqs, ews, scores)
+    return {
+        "verdict": verdict,
+        "mqs":     mqs,
+        "ews":     ews,
     }
