@@ -928,7 +928,244 @@ def render_overview_tab(data, brief, analytics, alerts, health_summary):
 
 # ─── TAB: MACRO ──────────────────────────────────────────────────────────────
 
-def render_macro_tab(data: dict):
+def render_risk_on_off_panel(analytics: dict) -> None:
+    """
+    Macro sekmesinin en üstüne eklenen Global Risk On/Off göstergesi.
+    Referans: son görseldeki terminal (Global Risk On/Off Indicator).
+    """
+    roo = analytics.get("risk_on_off")
+    if not roo:
+        return
+
+    color_map = {
+        "positive": ("var(--positive)", "rgba(50,217,140,0.14)", "rgba(50,217,140,0.32)"),
+        "warning":  ("var(--warning)",  "rgba(240,192,80,0.14)",  "rgba(240,192,80,0.32)"),
+        "negative": ("var(--negative)", "rgba(255,95,114,0.14)",  "rgba(255,95,114,0.32)"),
+    }
+
+    def colors(key):
+        return color_map.get(key, color_map["warning"])
+
+    def slider_html(score: float, color: str) -> str:
+        # RISK OFF ←――― NEUTRAL ―――→ RISK ON şeklinde slider
+        pct = max(2, min(98, score))
+        return (
+            "<div style='position:relative;height:6px;border-radius:99px;"
+            "background:linear-gradient(90deg,var(--negative) 0%,var(--warning) 50%,var(--positive) 100%);"
+            "margin:10px 0 4px'>"
+            "<div style='position:absolute;top:-3px;width:12px;height:12px;border-radius:50%;"
+            "background:#fff;border:2px solid " + color + ";"
+            "left:calc(" + str(pct) + "% - 6px);box-shadow:0 0 6px " + color + "'></div>"
+            "</div>"
+            "<div style='display:flex;justify-content:space-between;font-family:var(--font-mono);"
+            "font-size:0.6rem;color:var(--text-muted)'>"
+            "<span>RISK OFF</span><span>NEUTRAL</span><span>RISK ON</span>"
+            "</div>"
+        )
+
+    def score_block(label, score, signal, color_key, sub=None) -> str:
+        c_text, c_bg, c_border = colors(color_key)
+        sub_html = "<div style='font-family:var(--font-mono);font-size:0.66rem;color:var(--text-muted);margin-top:3px'>" + esc(sub) + "</div>" if sub else ""
+        return (
+            "<div style='padding:16px;border-radius:var(--r-md);border:1px solid " + c_border + ";"
+            "background:" + c_bg + "'>"
+            "<div style='font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.14em;"
+            "text-transform:uppercase;color:var(--text-muted);margin-bottom:4px'>" + esc(label) + "</div>"
+            "<div style='font-size:2.4rem;font-weight:900;letter-spacing:-0.08em;color:" + c_text + ";line-height:1'>"
+            + str(int(score)) + "</div>"
+            + sub_html +
+            slider_html(score, c_text) +
+            "<div style='display:inline-flex;align-items:center;padding:4px 10px;border-radius:99px;"
+            "border:1px solid " + c_border + ";font-family:var(--font-mono);font-size:0.72rem;"
+            "font-weight:700;color:" + c_text + ";margin-top:8px'>" + esc(signal) + "</div>"
+            "</div>"
+        )
+
+    def asset_row(a: dict) -> str:
+        val = a.get("value")
+        chg = a.get("change", "-")
+        pos = a.get("pos", False)
+        color = "var(--positive)" if pos else "var(--negative)" if val is not None else "var(--text-muted)"
+        return (
+            "<div style='display:flex;justify-content:space-between;align-items:center;"
+            "padding:5px 0;border-bottom:1px solid rgba(100,140,185,0.07)'>"
+            "<span style='font-size:0.8rem;color:var(--text-muted)'>" + esc(a["label"]) + "</span>"
+            "<span style='font-family:var(--font-mono);font-size:0.8rem;font-weight:600;color:" + color + "'>"
+            + esc(chg) + "</span>"
+            "</div>"
+        )
+
+    def region_card(r: dict) -> str:
+        c_text, c_bg, c_border = colors(r["color"])
+        assets_html = "".join(asset_row(a) for a in r["assets"][:3])
+        brd_bar = (
+            "<div style='margin-top:10px'>"
+            "<div style='display:flex;justify-content:space-between;font-family:var(--font-mono);"
+            "font-size:0.62rem;color:var(--text-muted);margin-bottom:4px'>"
+            "<span>BRD</span><span>" + str(r["breadth_pos"]) + "/" + str(r["breadth_total"]) + " pos</span>"
+            "</div>"
+            "<div style='height:4px;border-radius:99px;background:rgba(255,255,255,0.06)'>"
+            "<div style='width:" + str(r["breadth_pct"]) + "%;height:100%;border-radius:99px;background:" + c_text + "'></div>"
+            "</div>"
+            "<div style='display:flex;justify-content:space-between;font-family:var(--font-mono);"
+            "font-size:0.62rem;color:var(--text-muted);margin-top:4px'>"
+            "<span>AGR</span><span>" + str(int(r["agree_pct"])) + "%</span>"
+            "</div>"
+            "</div>"
+        )
+        return (
+            "<div style='padding:14px;border-radius:var(--r-md);border:1px solid var(--border);"
+            "background:rgba(255,255,255,0.022)'>"
+            "<div style='display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px'>"
+            "<div>"
+            "<div style='font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.12em;"
+            "text-transform:uppercase;color:var(--text-muted)'>" + esc(r["name"]) + "</div>"
+            "<div style='font-size:1.65rem;font-weight:900;letter-spacing:-0.06em;color:" + c_text + ";margin-top:2px;line-height:1'>"
+            + str(int(r["score"])) + "</div>"
+            "</div>"
+            "<span style='display:inline-flex;padding:4px 8px;border-radius:99px;border:1px solid " + c_border + ";"
+            "font-family:var(--font-mono);font-size:0.66rem;font-weight:700;color:" + c_text + "'>"
+            + esc(r["signal"]) + "</span>"
+            "</div>"
+            "<div style='font-family:var(--font-mono);font-size:0.62rem;color:var(--text-muted);margin-bottom:6px'>"
+            "COV " + esc(r["coverage"]) + "</div>"
+            + assets_html + brd_bar +
+            "</div>"
+        )
+
+    # Drivers & Drags
+    def driver_row(d: dict, is_driver: bool) -> str:
+        color = "var(--positive)" if is_driver else "var(--negative)"
+        return (
+            "<div style='display:flex;align-items:center;gap:8px;margin-bottom:6px'>"
+            "<div style='flex:1;height:16px;border-radius:4px;background:rgba(255,255,255,0.04);overflow:hidden'>"
+            "<div style='height:100%;background:" + color + ";opacity:0.7;"
+            "width:" + ("60%" if is_driver else "60%") + "'></div>"
+            "</div>"
+            "<span style='min-width:50px;font-family:var(--font-mono);font-size:0.72rem;color:var(--text-muted)'>"
+            + esc(d["label"]) + "</span>"
+            "<span style='min-width:54px;text-align:right;font-family:var(--font-mono);font-size:0.78rem;"
+            "font-weight:700;color:" + color + "'>" + esc(d["change"]) + "</span>"
+            "</div>"
+        )
+
+    drivers_html = "".join(driver_row(d, True)  for d in roo["drivers"])
+    drags_html   = "".join(driver_row(d, False) for d in roo["drags"])
+
+    # Macro stress assets
+    stress_assets_html = "".join(asset_row(a) for a in roo["macro_stress"]["assets"])
+    ms = roo["macro_stress"]
+    ms_c, ms_bg, ms_border = colors(ms["color"])
+
+    # Region cards HTML
+    region_cards_html = "".join(region_card(r) for r in roo["regions"])
+
+    # Ana layout
+    gc_text, gc_bg, gc_border = colors(roo["global_color"])
+    sc_text, sc_bg, sc_border = colors(roo["strict_color"])
+
+    html = (
+        # Başlık
+        "<div style='display:flex;align-items:center;justify-content:space-between;"
+        "margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border)'>"
+        "<div style='font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.2em;"
+        "text-transform:uppercase;color:var(--text-muted)'>GLOBAL RISK ON/OFF INDICATOR</div>"
+        "<div style='font-family:var(--font-mono);font-size:0.68rem;color:var(--text-muted)'>"
+        "COVERAGE " + esc(roo["coverage"]) + "</div>"
+        "</div>"
+
+        # Üst satır: Strict Sync | Drivers/Drags | Live Now
+        "<div style='display:grid;grid-template-columns:220px 1fr 220px;gap:14px;margin-bottom:14px'>"
+
+        # STRICT SYNC
+        + score_block("STRICT SYNC", roo["strict_score"], roo["strict_signal"], roo["strict_color"],
+                       sub=f"sync q · {roo['sync_q']}   agree q · {roo['agree_q']}") +
+
+        # DRIVERS + DRAGS
+        "<div style='padding:14px;border-radius:var(--r-md);border:1px solid var(--border);"
+        "background:rgba(255,255,255,0.022)'>"
+        "<div style='display:grid;grid-template-columns:1fr 1fr;gap:12px'>"
+        "<div>"
+        "<div style='font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.12em;"
+        "text-transform:uppercase;color:var(--positive);margin-bottom:8px'>▲ DRIVERS · LIVE NOW</div>"
+        + (drivers_html if drivers_html else "<div style='font-size:0.78rem;color:var(--text-muted)'>Veri bekleniyor</div>") +
+        "</div>"
+        "<div>"
+        "<div style='font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.12em;"
+        "text-transform:uppercase;color:var(--negative);margin-bottom:8px'>▼ DRAGS</div>"
+        + (drags_html if drags_html else "<div style='font-size:0.78rem;color:var(--text-muted)'>Veri bekleniyor</div>") +
+        "</div>"
+        "</div>"
+        "</div>"
+
+        # LIVE NOW
+        + score_block("LIVE NOW", roo["live_score"], roo["global_signal"], roo["global_color"],
+                       sub=f"risk on {roo['risk_on_count']} · neutral {roo['neutral_count']} · off {roo['risk_off_count']}") +
+
+        "</div>"  # üst grid bitti
+
+        # Bölge kartları
+        "<div style='display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:14px'>"
+        + region_cards_html +
+        "</div>"
+
+        # Macro Stress Block
+        "<div style='padding:14px;border-radius:var(--r-md);border:1px solid " + ms_border + ";"
+        "background:rgba(255,255,255,0.018)'>"
+        "<div style='display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:start'>"
+        "<div>"
+        "<div style='font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.12em;"
+        "text-transform:uppercase;color:var(--text-muted);margin-bottom:6px'>MACRO STRESS BLOCK</div>"
+        "<div style='font-size:1.5rem;font-weight:900;letter-spacing:-0.06em;color:" + ms_c + ";line-height:1'>"
+        + str(int(ms["score"])) + "</div>"
+        "<div style='display:inline-flex;padding:4px 8px;border-radius:99px;margin-top:6px;"
+        "border:1px solid " + ms_border + ";font-family:var(--font-mono);font-size:0.66rem;"
+        "font-weight:700;color:" + ms_c + "'>" + esc(ms["signal"]) + "</div>"
+        "</div>"
+        "<div style='display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px'>"
+    )
+
+    # Macro stress individual tiles
+    for a in ms["assets"]:
+        val = a.get("value")
+        pos = a.get("pos", False)
+        color = "var(--positive)" if pos else "var(--negative)" if val is not None else "var(--text-muted)"
+        # DXY/VIX/US10Y için açıklama notu
+        note = ""
+        if a["label"] == "DXY":   note = "1D"
+        elif a["label"] == "VIX":   note = "1D"
+        elif a["label"] == "US10Y": note = "1D"
+        elif a["label"] == "OIL":   note = "1D"
+        elif a["label"] == "GOLD":  note = "1D"
+        html += (
+            "<div style='padding:10px;border-radius:var(--r-sm);border:1px solid var(--border);"
+            "background:rgba(255,255,255,0.025)'>"
+            "<div style='font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.1em;"
+            "text-transform:uppercase;color:var(--text-muted)'>" + esc(a["label"]) + "</div>"
+            "<div style='font-size:1.3rem;font-weight:800;letter-spacing:-0.05em;color:" + color + ";margin-top:4px;line-height:1'>"
+            + esc(a["change"]) + "</div>"
+            "<div style='font-family:var(--font-mono);font-size:0.6rem;color:var(--text-muted);margin-top:3px'>"
+            + note + "</div>"
+            "</div>"
+        )
+
+    html += (
+        "</div>"   # grid 5 cols
+        "</div>"   # inner grid 2 cols
+        "</div>"   # macro stress block
+    )
+
+    st.markdown(
+        "<div style='padding:18px 20px;margin:0 0 16px 0;border-radius:var(--r-lg);"
+        "border:1px solid var(--border);background:linear-gradient(135deg,"
+        "rgba(8,15,26,0.97) 0%,rgba(10,20,34,0.97) 100%)'>"
+        + html +
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+
+def render_macro_tab(data: dict, analytics: dict):
     st.markdown(
         '<div class="s-kicker">Macro Intelligence</div>'
         '<div class="s-title">Makro & Piyasalar</div>'
@@ -936,6 +1173,9 @@ def render_macro_tab(data: dict):
         unsafe_allow_html=True,
     )
     st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
+
+    render_risk_on_off_panel(analytics)
+    st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
 
     st.markdown('<div style="font-size:0.72rem;font-family:var(--font-mono);letter-spacing:0.12em;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px">Risk Core</div>', unsafe_allow_html=True)
     render_table_row(data, [section_variant(MACRO_MARKET_SECTIONS[0]), section_variant(MACRO_MARKET_SECTIONS[2]), section_variant(MACRO_MARKET_SECTIONS[7])], 3, include_change=True)
@@ -1241,7 +1481,7 @@ render_control_rail(data, brief, last_updated, health_summary, alerts)
 
 tabs = st.tabs(["Terminal", "Macro", "Crypto", "Flow", "AGGR", "Reports", "Atlas"])
 with tabs[0]: render_overview_tab(data, brief, analytics, alerts, health_summary)
-with tabs[1]: render_macro_tab(data)
+with tabs[1]: render_macro_tab(data, analytics)
 with tabs[2]: render_crypto_tab(data)
 with tabs[3]: render_flow_risk_tab(data, health_summary)
 with tabs[4]: render_aggr_tab()
