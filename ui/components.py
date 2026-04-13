@@ -179,15 +179,26 @@ def render_health_bar(health_summary: dict):
 
 # ─── DATA TABLE CARD ─────────────────────────────────────────────────────────
 
-def build_data_table_card_html(title: str, rows, kicker: str = "", caption: str = "", show_delta: bool = False) -> str:
+def build_data_table_card_html(title: str, rows, kicker: str = "", caption: str = "", show_delta: bool = False, metric_context: dict | None = None) -> str:
     kicker_html  = f"<div class='dc-kicker'>{esc(kicker)}</div>" if kicker else ""
     caption_html = f"<div class='dc-caption'>{esc(caption)}</div>" if caption else ""
+
+    def _context_html(label: str) -> str:
+        if not metric_context:
+            return ""
+        ctx = metric_context.get(label, "")
+        if not ctx:
+            return ""
+        return (
+            f"<div style='font-size:0.66rem;color:var(--text-muted);opacity:0.7;"
+            f"margin-top:2px;line-height:1.4;padding-left:2px'>{esc(ctx)}</div>"
+        )
 
     if show_delta:
         head = "<div class='dc-grid-head dc-grid-head-delta'><span>Metrik</span><span>Deger</span><span>Gunluk %</span></div>"
         body = "".join(
             f"<div class='dc-row dc-row-delta'>"
-            f"<div class='dc-key'>{esc(label)}</div>"
+            f"<div class='dc-key'>{esc(label)}{_context_html(label)}</div>"
             f"<div class='dc-value'>{esc(display_value(val))}</div>"
             f"<div class='dc-delta {delta_css(delta)}'>{esc(clean_text(delta))}</div>"
             f"</div>"
@@ -197,7 +208,7 @@ def build_data_table_card_html(title: str, rows, kicker: str = "", caption: str 
         head = "<div class='dc-grid-head'><span>Metrik</span><span>Deger</span></div>"
         body = "".join(
             f"<div class='dc-row'>"
-            f"<div class='dc-key'>{esc(label)}</div>"
+            f"<div class='dc-key'>{esc(label)}{_context_html(label)}</div>"
             f"<div class='dc-value'>{esc(display_value(val))}</div>"
             f"</div>"
             for label, val in rows
@@ -212,8 +223,8 @@ def build_data_table_card_html(title: str, rows, kicker: str = "", caption: str 
     )
 
 
-def render_data_table_card(title: str, rows, kicker: str = "", caption: str = "", show_delta: bool = False):
+def render_data_table_card(title: str, rows, kicker: str = "", caption: str = "", show_delta: bool = False, metric_context: dict | None = None):
     st.markdown(
-        build_data_table_card_html(title, rows, kicker=kicker, caption=caption, show_delta=show_delta),
+        build_data_table_card_html(title, rows, kicker=kicker, caption=caption, show_delta=show_delta, metric_context=metric_context),
         unsafe_allow_html=True,
     )

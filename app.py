@@ -14,6 +14,7 @@ from openai import APIConnectionError, APIError, APITimeoutError, RateLimitError
 from domain.analytics import (
     DEFAULT_PINNED_METRICS,
     METRIC_LABELS,
+    METRIC_CONTEXT,
     build_alerts,
     build_analytics_payload,
     build_daily_summary_markdown,
@@ -120,12 +121,19 @@ def render_table_row(data: dict, sections: list[dict], cols: int, *, include_cha
     columns = st.columns(cols)
     for column, section in zip(columns, sections):
         with column:
+            # label → context: section rows'daki (label, key) çiftlerinden map kur
+            label_ctx = {
+                label: METRIC_CONTEXT[key]
+                for label, key in section["rows"]
+                if key in METRIC_CONTEXT
+            }
             render_data_table_card(
                 section["title"],
                 data_rows(data, section["rows"], include_change=include_change),
                 kicker=section.get("kicker", ""),
                 caption=section.get("caption", ""),
                 show_delta=include_change,
+                metric_context=label_ctx or None,
             )
 
 
@@ -214,6 +222,86 @@ def init_ui_state():
         st.session_state["control_rail_open"] = True
     if "macro_bulten_report" not in st.session_state:
         st.session_state["macro_bulten_report"] = None
+    if "onboarding_done" not in st.session_state:
+        st.session_state["onboarding_done"] = False
+
+
+# ─── ONBOARDING WIZARD ───────────────────────────────────────────────────────
+
+_ONBOARDING_PROFILES = {
+    "Aktif Trader": {
+        "default_tab": 0,  # Terminal
+        "pinned_metrics": ["BTC_P", "BTC_C", "FR", "FNG", "VIX", "ETF_FLOW_TOTAL", "USDT_D", "OI"],
+        "tip": "Decision Bar'ı her gün açılışta kontrol et — EVET/DİKKAT/HAYIR skor seni yönlendirir.",
+    },
+    "Araştırmacı / Analist": {
+        "default_tab": 5,  # Reports (yeni numaralandırmada)
+        "pinned_metrics": ["BTC_P", "BTC_C", "BTC_7D", "TOTAL_CAP", "DXY", "VIX", "ETF_FLOW_TOTAL", "M2"],
+        "tip": "Atlas sekmesi tüm ham veriyi içeriyor. Raporlar sekmesinden PDF/Markdown export alabilirsin.",
+    },
+    "İçerik Üreticisi / Newsletter": {
+        "default_tab": 5,  # Reports
+        "pinned_metrics": ["BTC_P", "BTC_C", "FNG", "ETF_FLOW_TOTAL", "FR", "TOTAL_CAP", "DXY", "VIX"],
+        "tip": "Raporlar sekmesinde AI bülten üret, ardından X thread paketini kopyalayarak paylaş.",
+    },
+}
+
+
+def render_onboarding_wizard():
+    """
+    İlk açılışta gösterilir. Kullanıcı profiline göre pinned_metrics ayarlanır.
+    session_state['onboarding_done'] = True set edilince kapanır.
+    """
+    st.markdown(
+        "<div style='max-width:560px;margin:60px auto 0'>"
+        "<div style='font-family:var(--font-mono);font-size:0.7rem;letter-spacing:0.18em;"
+        "text-transform:uppercase;color:var(--accent);margin-bottom:10px'>SA Finance Alpha Terminal</div>"
+        "<div style='font-size:1.5rem;font-weight:700;color:var(--text-primary);margin-bottom:8px'>"
+        "Terminali sana göre ayarlayalım</div>"
+        "<div style='font-size:0.9rem;color:var(--text-muted);margin-bottom:28px;line-height:1.6'>"
+        "Bu terminal makro, kripto ve türev verilerini tek ekranda toplar. "
+        "Nasıl kullandığına göre başlangıç görünümünü kişiselleştirelim.</div>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    col_l, col_c, col_r = st.columns([1, 2, 1])
+    with col_c:
+        st.markdown("**Seni en iyi tanımlayan hangisi?**")
+        profile_choice = st.radio(
+            "Profil",
+            options=list(_ONBOARDING_PROFILES.keys()),
+            index=0,
+            label_visibility="collapsed",
+        )
+
+        profile = _ONBOARDING_PROFILES[profile_choice]
+        st.markdown(
+            f"<div style='padding:10px 14px;border-radius:6px;border:1px solid var(--border);"
+            f"background:rgba(255,255,255,0.03);font-size:0.82rem;color:var(--text-muted);"
+            f"margin:10px 0 18px;line-height:1.55'>"
+            f"💡 {profile['tip']}</div>",
+            unsafe_allow_html=True,
+        )
+
+        if st.button("Terminali Aç →", use_container_width=True, type="primary"):
+            prefs = st.session_state["preferences"]
+            prefs["pinned_metrics"] = profile["pinned_metrics"]
+            prefs["_onboarding_profile"] = profile_choice
+            from services.preferences import save_preferences
+            save_preferences(prefs)
+            st.session_state["preferences"] = prefs
+            st.session_state["onboarding_done"] = True
+            st.rerun()
+
+        st.markdown(
+            "<div style='text-align:center;margin-top:8px'>",
+            unsafe_allow_html=True,
+        )
+        if st.button("Atla", use_container_width=False):
+            st.session_state["onboarding_done"] = True
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
 
 
 def render_preferences_panel(host, key_prefix: str = "prefs", *, expanded: bool = False):
@@ -241,11 +329,17 @@ def render_preferences_panel(host, key_prefix: str = "prefs", *, expanded: bool 
         funding_above = host.number_input("Funding > X",    value=float(preferences["thresholds"].get("funding_above", 0.01)), step=0.005, format="%.4f", key=f"{key_prefix}_funding_above")
         vix_above     = host.number_input("VIX > Y",        value=float(preferences["thresholds"].get("vix_above", 25.0)),     step=0.5,   format="%.2f", key=f"{key_prefix}_vix_above")
         etf_flow      = host.number_input("ETF netflow < Z", value=float(preferences["thresholds"].get("etf_flow_below", 0.0)), step=10.0,  format="%.1f", key=f"{key_prefix}_etf_flow_below")
+        dxy_above     = host.number_input("DXY > W",        value=float(preferences["thresholds"].get("dxy_above", 105.0)),    step=0.5,   format="%.2f", key=f"{key_prefix}_dxy_above")
         if host.button("Ayarları Kaydet", key=f"{key_prefix}_save", use_container_width=True):
             preferences["view_mode"]    = view_mode
             preferences["report_depth"] = report_depth
             preferences["pinned_metrics"] = pinned_metrics[:8]
-            preferences["thresholds"] = {"funding_above": funding_above, "vix_above": vix_above, "etf_flow_below": etf_flow}
+            preferences["thresholds"] = {
+                "funding_above": funding_above,
+                "vix_above": vix_above,
+                "etf_flow_below": etf_flow,
+                "dxy_above": dxy_above,
+            }
             save_preferences(preferences)
             st.session_state["preferences"] = preferences
             host.success("Ayarlar kaydedildi.")
@@ -415,6 +509,36 @@ def render_score_panel(analytics: dict):
     for f in scores["factors"]:
         delta_text, delta_cls = score_delta_meta(f["delta_7d"])
         drivers_html = "".join(f"<div class='fc-driver'>{esc(d)}</div>" for d in f["drivers"])
+
+        # "Neden bu skor?" — primary_support ve primary_risk zaten var
+        primary_support = f.get("primary_support", "")
+        primary_risk    = f.get("primary_risk", "")
+        why_html = ""
+        if primary_support or primary_risk:
+            why_parts = []
+            if primary_support:
+                why_parts.append(
+                    f"<div style='display:flex;gap:6px;align-items:baseline;margin-bottom:3px'>"
+                    f"<span style='font-family:var(--font-mono);font-size:0.6rem;color:var(--positive);min-width:48px'>DESTEK</span>"
+                    f"<span style='font-size:0.74rem;color:var(--text-muted)'>{esc(primary_support)}</span>"
+                    f"</div>"
+                )
+            if primary_risk:
+                why_parts.append(
+                    f"<div style='display:flex;gap:6px;align-items:baseline'>"
+                    f"<span style='font-family:var(--font-mono);font-size:0.6rem;color:var(--negative);min-width:48px'>RİSK</span>"
+                    f"<span style='font-size:0.74rem;color:var(--text-muted)'>{esc(primary_risk)}</span>"
+                    f"</div>"
+                )
+            why_html = (
+                f"<div style='margin-top:8px;padding:7px 9px;border-radius:5px;"
+                f"border:1px solid rgba(100,140,185,0.12);background:rgba(255,255,255,0.02)'>"
+                f"<div style='font-family:var(--font-mono);font-size:0.58rem;letter-spacing:0.14em;"
+                f"text-transform:uppercase;color:var(--text-muted);margin-bottom:5px'>Neden bu skor?</div>"
+                f"{''.join(why_parts)}"
+                f"</div>"
+            )
+
         factor_cards += (
             f'<div class="factor-card">'
             f'<div class="fc-head"><span class="fc-name">{esc(f["label"])}</span><span class="fc-weight">Weight {f["weight_pct"]}%</span></div>'
@@ -423,6 +547,7 @@ def render_score_panel(analytics: dict):
             f'<div class="fc-delta {delta_cls}">{delta_text}</div>'
             f'</div>'
             f'<div class="fc-copy">{esc(f["summary"])}</div>'
+            f'{why_html}'
             f'<div class="fc-meta"><span>Katkı {f["contribution"]:.1f} pt</span><span>{esc(f["trend_text"])}</span></div>'
             f'<div class="fc-drivers">{drivers_html}</div>'
             f'</div>'
@@ -1189,88 +1314,58 @@ def render_macro_tab(data: dict, analytics: dict):
     render_table_row(data, [section_variant(MACRO_MARKET_SECTIONS[5]), section_variant(MACRO_MARKET_SECTIONS[6])], 2, include_change=True)
 
 
-# ─── TAB: CRYPTO ─────────────────────────────────────────────────────────────
+# ─── TAB: SIGNALS (Flow + Crypto birleşik) ───────────────────────────────────
 
-def render_crypto_tab(data: dict):
+def render_signals_tab(data: dict, health_summary: dict):
     st.markdown(
-        '<div class="s-kicker">Crypto Intelligence</div>'
-        '<div class="s-title">Kripto Radar</div>'
-        '<div class="s-subtitle">Fiyat akisi, 7 gunluk relatif performans ve BTC bazli guc/zayiflik okumasi.</div>',
+        '<div class="s-kicker">Signals Intelligence</div>'
+        '<div class="s-title">Sinyaller</div>'
+        '<div class="s-subtitle">Türev & akış verileri ile kripto radar tek sekmede.</div>',
         unsafe_allow_html=True,
     )
     st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
 
-    price_cards = [
-        (f"{name} ({symbol})", data.get(pk, "-"), data.get(ck, "-"))
-        for name, symbol, pk, ck, _ in CRYPTO_RADAR_ASSETS
-    ]
-    btc_week = data.get("BTC_7D", "-")
-    weekly_cards = [
-        (f"{symbol} · 24h {display_value(data.get(ck,'-'))}", data.get(wk, "-"), relative_to_btc_tone(data.get(wk), btc_week))
-        for _, symbol, _, ck, wk in CRYPTO_RADAR_ASSETS
-    ]
+    inner_tabs = st.tabs(["Türev & Akış", "Kripto Radar"])
 
-    cat("Price Snapshot", "●")
-    render_cards(price_cards, cols=4, compact=True)
-    st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
-    cat("Relative Performance vs BTC", "◨")
-    render_compact_metric_strip(weekly_cards, cols=3)
+    with inner_tabs[0]:
+        scores   = build_analytics_payload(data)["scores"]
+        factors  = {f["key"]: f for f in scores["factors"]}
+        part     = scores["participation"]
+        m_bread  = part["subfactors"]["macro"]
+        c_bread  = part["subfactors"]["crypto"]
 
+        summary_cards = [
+            ("Positioning", f"{factors['positioning']['score']}/100", factors["positioning"]["state"]),
+            ("Liquidity",   f"{factors['liquidity']['score']}/100",   factors["liquidity"]["primary_support"]),
+            ("Participation", f"{part['score']}/100",                 participation_alignment_label(m_bread["score"], c_bread["score"])),
+            ("Execution",   display_value(data.get("BTC_P", "-")),    display_value(data.get("ORDERBOOK_SIGNAL", "-"))),
+        ]
+        render_cards(summary_cards, cols=4, compact=True)
+        st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
 
-# ─── TAB: FLOW ───────────────────────────────────────────────────────────────
+        with st.expander("Derivatives & Sentiment", expanded=True):
+            render_table_row(data, [section_variant(FLOW_RISK_SECTIONS[0]), section_variant(FLOW_RISK_SECTIONS[1])], 2)
+        with st.expander("Liquidity Plumbing", expanded=False):
+            render_table_row(data, [section_variant(FLOW_RISK_SECTIONS[2])], 1)
+        with st.expander("Breadth Inputs & Rotation", expanded=False):
+            render_table_row(data, [section_variant(FLOW_RISK_SECTIONS[3]), section_variant(FLOW_RISK_SECTIONS[4])], 2)
 
-def render_flow_risk_tab(data: dict, health_summary: dict):
-    st.markdown(
-        '<div class="s-kicker">Flow & Risk Surfaces</div>'
-        '<div class="s-title">Akış & Risk Katmanları</div>'
-        '<div class="s-subtitle">Terminal özetini tekrar etmez; sinyalin hammaddesini ve takibini taşır.</div>',
-        unsafe_allow_html=True,
-    )
-    scores   = build_analytics_payload(data)["scores"]
-    factors  = {f["key"]: f for f in scores["factors"]}
-    part     = scores["participation"]
-    m_bread  = part["subfactors"]["macro"]
-    c_bread  = part["subfactors"]["crypto"]
-
-    summary_cards = [
-        ("Positioning", f"{factors['positioning']['score']}/100", factors["positioning"]["state"]),
-        ("Liquidity",   f"{factors['liquidity']['score']}/100",   factors["liquidity"]["primary_support"]),
-        ("Participation",f"{part['score']}/100",                  participation_alignment_label(m_bread["score"], c_bread["score"])),
-        ("Execution",   display_value(data.get("BTC_P","-")),     display_value(data.get("ORDERBOOK_SIGNAL","-"))),
-    ]
-    render_cards(summary_cards, cols=4, compact=True)
-    st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
-
-    with st.expander("Derivatives & Sentiment", expanded=True):
-        render_table_row(data, [section_variant(FLOW_RISK_SECTIONS[0]), section_variant(FLOW_RISK_SECTIONS[1])], 2)
-    with st.expander("Liquidity Plumbing", expanded=False):
-        render_table_row(data, [section_variant(FLOW_RISK_SECTIONS[2])], 1)
-    with st.expander("Breadth Inputs & Rotation", expanded=False):
-        render_table_row(data, [section_variant(FLOW_RISK_SECTIONS[3]), section_variant(FLOW_RISK_SECTIONS[4])], 2)
-
-
-# ─── TAB: AGGR ───────────────────────────────────────────────────────────────
-
-def render_aggr_tab():
-    st.markdown(
-        '<div class="s-kicker">Live Orderflow</div>'
-        '<div class="s-title">AGGR · Canlı Tape</div>'
-        '<div class="s-subtitle">Terminal içine gömülü panel değil, AGGR yüzeyine temiz bir geçit.</div>',
-        unsafe_allow_html=True,
-    )
-    st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
-
-    left, right = st.columns([0.3, 0.7])
-    with left:
-        st.link_button("AGGR'ı Yeni Sekmede Aç", AGGR_PANEL_URL, use_container_width=True)
-    with right:
-        st.markdown(
-            '<div class="surface surface-sm">'
-            '<div class="s-kicker">Neden harici açılıyor?</div>'
-            '<div class="s-subtitle">AGGR kendi güvenlik politikasıyla iframe açılışını reddediyor. En temiz deneyim, boş panel yerine doğrudan dış aracı açmak.</div>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
+    with inner_tabs[1]:
+        st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+        price_cards = [
+            (f"{name} ({symbol})", data.get(pk, "-"), data.get(ck, "-"))
+            for name, symbol, pk, ck, _ in CRYPTO_RADAR_ASSETS
+        ]
+        btc_week = data.get("BTC_7D", "-")
+        weekly_cards = [
+            (f"{symbol} · 24h {display_value(data.get(ck, '-'))}", data.get(wk, "-"), relative_to_btc_tone(data.get(wk), btc_week))
+            for _, symbol, _, ck, wk in CRYPTO_RADAR_ASSETS
+        ]
+        cat("Price Snapshot", "●")
+        render_cards(price_cards, cols=4, compact=True)
+        st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
+        cat("Relative Performance vs BTC", "◨")
+        render_compact_metric_strip(weekly_cards, cols=3)
 
 
 # ─── TAB: REPORTS ────────────────────────────────────────────────────────────
@@ -1340,6 +1435,61 @@ def render_report_tab(client, data, brief, analytics, alerts, health_summary, re
         )
     slot_key = "1630" if slot_choice == "16:30 Bulteni" else "2245"
 
+    # ── Market Tools + News — üstte, hemen erişilebilir ─────────────────────
+    tools_col, news_col = st.columns([1.1, 0.9])
+    with tools_col:
+        with st.expander("Market Tools", expanded=False):
+            tool_tabs = st.tabs(["BTC Chart", "Economic Calendar", "Google Trends"])
+            with tool_tabs[0]:
+                components.html(
+                    '<div style="height:420px">'
+                    '<div id="tv_mc" style="height:100%"></div>'
+                    '<script src="https://s3.tradingview.com/tv.js"></script>'
+                    '<script>new TradingView.widget({autosize:true,symbol:"BINANCE:BTCUSDT",interval:"D",'
+                    'theme:"dark",style:"1",locale:"tr",toolbar_bg:"#050d18",container_id:"tv_mc"});</script>'
+                    '</div>',
+                    height=440,
+                )
+            with tool_tabs[1]:
+                components.html(
+                    '<div class="tradingview-widget-container">'
+                    '<div class="tradingview-widget-container__widget"></div>'
+                    '<script src="https://s3.tradingview.com/external-embedding/embed-widget-events.js" async>'
+                    '{"colorTheme":"dark","isTransparent":true,"width":"100%","height":"400","locale":"tr",'
+                    '"importanceFilter":"0,1","currencyFilter":"USD,EUR"}</script></div>',
+                    height=420,
+                )
+            with tool_tabs[2]:
+                st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+                st.markdown(
+                    '<div class="section-notice">'
+                    'Google Trends, iframe içine yüklenmeye izin vermiyor (güvenlik politikası). '
+                    'Aşağıdaki butonu kullanarak doğrudan Google Trends sayfasını aç.'
+                    '</div>',
+                    unsafe_allow_html=True,
+                )
+                st.link_button(
+                    "Google Trends'te Aç — Bitcoin · Altın · Petrol · ABD Doları · Hisse",
+                    "https://trends.google.com/trends/explore?q=%2Fm%2F05p0rrx,%2Fm%2F025rs2z,%2Fm%2F05r_j,%2Fm%2F09nqf,%2Fm%2F077mq&hl=tr&date=today+12-m,today+12-m,today+12-m,today+12-m,today+12-m",
+                    use_container_width=True,
+                )
+    with news_col:
+        with st.expander("News & Catalysts", expanded=False):
+            news = data.get("NEWS", [])
+            if news:
+                for item in news[:6]:
+                    st.markdown(
+                        f'<div class="news-card">'
+                        f'<a href="{html.escape(str(item["url"]))}" target="_blank">{html.escape(str(item["title"]))}</a>'
+                        f'<div class="news-meta">{html.escape(str(item["time"]))} · {html.escape(str(item["source"]))}</div>'
+                        f'</div>',
+                        unsafe_allow_html=True,
+                    )
+            else:
+                st.info("Haber akisi su an yok.")
+
+    st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
+
     # ── Cached rapor yoksa AI raporu, varsa diskten oku ─────────────────────
     cached = load_latest_report(slot_key)
 
@@ -1397,44 +1547,6 @@ def render_report_tab(client, data, brief, analytics, alerts, health_summary, re
         st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
         _render_cached_report_panel(selected)
 
-    # ── Market Tools ─────────────────────────────────────────────────────────
-    st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
-    with st.expander("Market Tools", expanded=False):
-        tool_tabs = st.tabs(["BTC Chart", "Economic Calendar"])
-        with tool_tabs[0]:
-            components.html(
-                '<div style="height:420px">'
-                '<div id="tv_mc" style="height:100%"></div>'
-                '<script src="https://s3.tradingview.com/tv.js"></script>'
-                '<script>new TradingView.widget({autosize:true,symbol:"BINANCE:BTCUSDT",interval:"D",'
-                'theme:"dark",style:"1",locale:"tr",toolbar_bg:"#050d18",container_id:"tv_mc"});</script>'
-                '</div>',
-                height=440,
-            )
-        with tool_tabs[1]:
-            components.html(
-                '<div class="tradingview-widget-container">'
-                '<div class="tradingview-widget-container__widget"></div>'
-                '<script src="https://s3.tradingview.com/external-embedding/embed-widget-events.js" async>'
-                '{"colorTheme":"dark","isTransparent":true,"width":"100%","height":"400","locale":"tr",'
-                '"importanceFilter":"0,1","currencyFilter":"USD,EUR"}</script></div>',
-                height=420,
-            )
-
-    with st.expander("News & Catalysts", expanded=False):
-        news = data.get("NEWS", [])
-        if news:
-            for item in news[:6]:
-                st.markdown(
-                    f'<div class="news-card">'
-                    f'<a href="{html.escape(str(item["url"]))}" target="_blank">{html.escape(str(item["title"]))}</a>'
-                    f'<div class="news-meta">{html.escape(str(item["time"]))} · {html.escape(str(item["source"]))}</div>'
-                    f'</div>',
-                    unsafe_allow_html=True,
-                )
-        else:
-            st.info("Haber akisi su an yok.")
-
 
 # ─── TAB: ATLAS ──────────────────────────────────────────────────────────────
 
@@ -1475,15 +1587,37 @@ analytics      = build_analytics_payload(data)
 alerts         = build_alerts(data, preferences.get("thresholds", {}))
 
 render_page_header(last_updated, health_summary, brief, preferences, analytics)
+
+# ─── Onboarding gate — header dışında her şeyi gizle ────────────────────────
+if not st.session_state.get("onboarding_done", False):
+    render_onboarding_wizard()
+    st.stop()
+
 render_status_hub(last_updated, health_summary, alerts, analytics)
 render_sidebar(data, brief, last_updated, health_summary, preferences, alerts)
 render_control_rail(data, brief, last_updated, health_summary, alerts)
 
-tabs = st.tabs(["Terminal", "Macro", "Crypto", "Flow", "AGGR", "Reports", "Atlas"])
+# ─── Sidebar kapalıysa ana alanda "Menüyü Aç" butonu göster ─────────────────
+# Streamlit sidebar'ı JS ile kontrol etmek mümkün değil; bunun yerine
+# sidebar içinde her zaman görünür bir "Sidebar açık" işareti koyuyoruz.
+# Kullanıcı sidebar'ı kapattığında Streamlit'in kendi açma okunu kullanabilir,
+# ama bunu daha belirgin yapmak için sidebar'ın en üstüne sabit bir ipucu ekliyoruz.
+
+# ─── Decision Bar — tüm sekmeler üstünde global ──────────────────────────────
+render_decision_bar(analytics)
+
+# ─── 5 sekme ─────────────────────────────────────────────────────────────────
+tabs = st.tabs(["Terminal", "Macro", "Sinyaller", "Raporlar", "Atlas"])
 with tabs[0]: render_overview_tab(data, brief, analytics, alerts, health_summary)
 with tabs[1]: render_macro_tab(data, analytics)
+<<<<<<< Updated upstream
 with tabs[2]: render_crypto_tab(data)
 with tabs[3]: render_flow_risk_tab(data, health_summary)
 with tabs[4]: render_aggr_tab()
 with tabs[5]: render_report_tab(client, data, brief, analytics, alerts, health_summary, preferences.get("report_depth", "Orta"))
 with tabs[6]: render_all_metrics_tab(data)
+=======
+with tabs[2]: render_signals_tab(data, health_summary)
+with tabs[3]: render_report_tab(client, data, brief, analytics, alerts, health_summary, preferences.get("report_depth", "Orta"))
+with tabs[4]: render_all_metrics_tab(data)
+>>>>>>> Stashed changes

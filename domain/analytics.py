@@ -32,6 +32,30 @@ METRIC_LABELS = {
     "FED": "FED",
 }
 
+# Metrik başvuru eşikleri — data table card'larda bağlam notu olarak gösterilir
+METRIC_CONTEXT: dict[str, str] = {
+    "FR":              "Nötr: 0% · Dikkat: >+0.01% · Aşırı: >+0.03%",
+    "FNG":             "Aşırı Korku: 0–24 · Korku: 25–44 · Nötr: 45–55 · Açgözlülük: 56–74 · Aşırı: 75–100",
+    "VIX":             "Normal: <20 · Endişe: 20–30 · Korku: 30–40 · Panik: >40",
+    "ETF_FLOW_TOTAL":  "Güçlü Giriş: >500M · Giriş: >0 · Çıkış: <0 · Güçlü Çıkış: <-200M",
+    "USDT_D":          "Düşük (risk-on): <4% · Nötr: 4–6% · Yüksek (risk-off): >6%",
+    "STABLE_C_D":      "Pozitif: piyasaya stablecoin giriyor · Negatif: stablecoin çekiliyor",
+    "OI":              "Yükselen OI + yükselen fiyat: sağlıklı. Yükselen OI + düşen fiyat: dikkat.",
+    "DXY":             "Güçlü DXY genellikle kripto için baskıcı. Zayıf DXY risk-on ortamı destekler.",
+    "US10Y":           "Hızlı yükseliş likiditeyi sıkar. >4.5% seviyeleri risk varlıkları için baskı.",
+    "M2":              "M2 YoY artışı likidite genişlemesine işaret eder; kripto için tarihsel olarak pozitif.",
+    "Dom":             "BTC Dom artışı: altcoin riskten kaçış. Düşüş: altcoin sezonuna geçiş sinyali.",
+    "ETH_Dom":         "ETH dom güçleniyorsa ETH liderliği; zayıflıyorsa BTC veya altcoin rotasyonu.",
+    "LS_Ratio":        "L/S >1: uzun pozisyon ağırlıklı. <1: short ağırlıklı. Aşırı uçlar dikkat sinyali.",
+    "Sup_Wall":        "Mevcut fiyatın altındaki en güçlü alım duvarı seviyesi.",
+    "Res_Wall":        "Mevcut fiyatın üstündeki en güçlü satış duvarı seviyesi.",
+    "Hash":            "Hashrate artışı madenci güvenini ve ağ sağlığını gösterir.",
+    "Active":          "Aktif adres artışı on-chain kullanım ve talep artışına işaret eder.",
+    "TOTAL_CAP":       "Tüm kripto piyasa değeri. Yeni ATH yaklaşımı geniş katılımı gösterir.",
+    "TOTAL2_CAP":      "BTC hariç kripto piyasa değeri. Altcoin sezonu göstergesi.",
+    "TOTAL3_CAP":      "BTC ve ETH hariç. Küçük/orta cap katılımını ölçer.",
+}
+
 
 def clamp_score(value: float) -> int:
     return max(0, min(100, int(round(value))))
@@ -895,13 +919,15 @@ def build_scenario_matrix(data: dict) -> list[dict]:
 
 def build_alerts(data: dict, thresholds: dict) -> list[dict]:
     alerts = []
-    funding = parse_number(data.get("FR"))
-    vix = parse_number(data.get("VIX"))
+    funding  = parse_number(data.get("FR"))
+    vix      = parse_number(data.get("VIX"))
     etf_flow = parse_number(data.get("ETF_FLOW_TOTAL"))
+    dxy      = parse_number(data.get("DXY"))
 
     funding_above = thresholds.get("funding_above")
-    vix_above = thresholds.get("vix_above")
-    etf_below = thresholds.get("etf_flow_below")
+    vix_above     = thresholds.get("vix_above")
+    etf_below     = thresholds.get("etf_flow_below")
+    dxy_above     = thresholds.get("dxy_above")
 
     if funding is not None and funding_above is not None and funding > funding_above:
         alerts.append(
@@ -925,6 +951,14 @@ def build_alerts(data: dict, thresholds: dict) -> list[dict]:
                 "title": "ETF alarmi",
                 "detail": f"ETF netflow {data.get('ETF_FLOW_TOTAL', PLACEHOLDER)} | esik {etf_below:.1f}",
                 "level": "error",
+            }
+        )
+    if dxy is not None and dxy_above is not None and dxy > dxy_above:
+        alerts.append(
+            {
+                "title": "DXY alarmi",
+                "detail": f"DXY {data.get('DXY', PLACEHOLDER)} | esik {dxy_above:.2f} — güçlü dolar kripto için baskıcı",
+                "level": "warning",
             }
         )
 

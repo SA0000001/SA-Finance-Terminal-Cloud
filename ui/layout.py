@@ -3,11 +3,14 @@ SA Finance Alpha Terminal — Layout Module
 Page header, Status Hub, sidebar. No business logic here.
 """
 import html as _html
+import re
 
 import pandas as pd
 import streamlit as st
 
+from domain.analytics import DEFAULT_PINNED_METRICS, METRIC_LABELS
 from services.health import normalize_health_display_text
+from services.preferences import save_preferences
 from ui.components import bi_label, clean_text, display_value, esc, render_health_bar
 
 
@@ -15,7 +18,32 @@ def normalize_health_cell(value) -> str:
     return clean_text(normalize_health_display_text(value))
 
 
-# ─── PAGE HEADER ─────────────────────────────────────────────────────────────
+# ─── KULLANICI DOSTU HATA MESAJLARI ──────────────────────────────────────────
+
+_ERROR_PATTERNS: list[tuple[str, str]] = [
+    (r"HTTP 4(0[13]|29)",   "Veri kaynağı erişim reddetti — yakında otomatik yeniden denenecek."),
+    (r"HTTP 404",           "Veri kaynağı adresi değişmiş olabilir — geçici olarak atlanıyor."),
+    (r"HTTP 5\d\d",         "Veri kaynağı sunucu tarafında hata verdi — genellikle kısa sürede düzelir."),
+    (r"timeout|Timeout|timed out", "Veri kaynağına bağlanılamadı (zaman aşımı) — otomatik yeniden denenecek."),
+    (r"Connection|connection refused", "Veri kaynağına bağlantı kurulamadı — internet bağlantısını kontrol et."),
+    (r"JSONDecodeError|json|JSON",     "Veri kaynağından beklenmedik yanıt geldi — geçici olarak atlanıyor."),
+    (r"KeyError|IndexError|TypeError", "Veri formatı değişmiş olabilir — kaynak güncelleniyor."),
+    (r"Rate limit|rate limit|429",     "Veri kaynağı sorgu limitine ulaşıldı — biraz bekle, otomatik devam edecek."),
+    (r"SSL|ssl|certificate",           "Güvenli bağlantı hatası — veri kaynağı geçici olarak erişilemez."),
+    (r"No data|empty|boş",             "Bu kaynaktan şu an veri gelmiyor — bir sonraki güncellemeye kadar bekleniyor."),
+]
+_ERROR_FALLBACK = "Veri kaynağında geçici bir sorun var — otomatik olarak yeniden denenecek."
+
+
+def friendly_error(raw: str) -> str:
+    """Teknik hata metnini kullanıcı dostu Türkçeye çevirir."""
+    if not raw or raw in ("-", ""):
+        return _ERROR_FALLBACK
+    for pattern, message in _ERROR_PATTERNS:
+        if re.search(pattern, raw, re.IGNORECASE):
+            return message
+    return _ERROR_FALLBACK
+
 
 def render_page_header(last_updated: str, health_summary: dict, brief: dict, preferences: dict, analytics: dict):
     scores = analytics["scores"]
@@ -108,10 +136,11 @@ def render_status_hub(last_updated: str, health_summary: dict, alerts: list[dict
     )
 
     if issue_rows:
-        with st.expander("Source health details", expanded=False):
+        with st.expander(f"Veri kaynağı sorunları ({issue_count})", expanded=False):
             for row in issue_rows[:6]:
                 source       = normalize_health_cell(row.get("Kaynak"))
-                error        = normalize_health_cell(row.get("Hata"))
+                raw_error    = normalize_health_cell(row.get("Hata"))
+                error        = friendly_error(raw_error)
                 status       = normalize_health_cell(row.get("Durum"))
                 last_success = normalize_health_cell(row.get("Son basarili"))
                 left, right  = st.columns([5, 1.2], vertical_alignment="top")
@@ -147,12 +176,66 @@ def render_health_panel(health_summary: dict):
 
 # ─── SIDEBAR ─────────────────────────────────────────────────────────────────
 
+def _render_sidebar_preferences():
+    """Sidebar'da kalıcı Görünüm ve Uyarılar paneli."""
+    prefs = st.session_state.get("preferences", {})
+    thresholds = prefs.get("thresholds", {})
+
+    with st.expander("Görünüm ve Uyarılar", expanded=False):
+        view_mode = st.radio(
+            "Görünüm modu",
+            ["Basit", "Pro"],
+            index=0 if prefs.get("view_mode") == "Basit" else 1,
+            key="sidebar_pref_view_mode",
+        )
+        report_depth = st.selectbox(
+            "Rapor seviyesi",
+            ["Kısa", "Orta", "Derin"],
+            index=["Kısa", "Orta", "Derin"].index(prefs.get("report_depth", "Orta")),
+            key="sidebar_pref_report_depth",
+        )
+        pinned_metrics = st.multiselect(
+            "Pinli metrikler",
+            options=list(METRIC_LABELS),
+            default=prefs.get("pinned_metrics", DEFAULT_PINNED_METRICS),
+            format_func=lambda key: METRIC_LABELS.get(key, key),
+            key="sidebar_pref_pinned",
+        )
+        st.markdown(
+            "<div style='font-size:0.72rem;color:var(--text-muted);margin:8px 0 4px;"
+            "font-family:var(--font-mono);letter-spacing:0.1em;text-transform:uppercase'>Alarm eşikleri</div>",
+            unsafe_allow_html=True,
+        )
+        funding_above = st.number_input("Funding > X",     value=float(thresholds.get("funding_above", 0.01)), step=0.005, format="%.4f", key="sidebar_thr_funding")
+        vix_above     = st.number_input("VIX > Y",         value=float(thresholds.get("vix_above", 25.0)),     step=0.5,   format="%.2f", key="sidebar_thr_vix")
+        etf_flow      = st.number_input("ETF netflow < Z", value=float(thresholds.get("etf_flow_below", 0.0)), step=10.0,  format="%.1f", key="sidebar_thr_etf")
+        dxy_above     = st.number_input("DXY > W",         value=float(thresholds.get("dxy_above", 105.0)),    step=0.5,   format="%.2f", key="sidebar_thr_dxy")
+
+        if st.button("Ayarları Kaydet", key="sidebar_pref_save", use_container_width=True):
+            prefs["view_mode"]      = view_mode
+            prefs["report_depth"]   = report_depth
+            prefs["pinned_metrics"] = pinned_metrics[:8]
+            prefs["thresholds"] = {
+                "funding_above":  funding_above,
+                "vix_above":      vix_above,
+                "etf_flow_below": etf_flow,
+                "dxy_above":      dxy_above,
+            }
+            save_preferences(prefs)
+            st.session_state["preferences"] = prefs
+            st.success("Ayarlar kaydedildi.")
+
+
 def render_sidebar(data, brief, last_updated: str, health_summary: dict, preferences: dict, alerts: list[dict]):
     with st.sidebar:
         st.markdown(
             '<div class="s-kicker" style="margin-bottom:6px">SA Finance Terminal</div>'
             '<div style="font-size:0.92rem;font-weight:700;color:var(--text-primary);margin-bottom:4px">Control Rail</div>'
-            f'<div style="font-size:0.74rem;color:var(--text-muted);margin-bottom:14px">{esc(last_updated)}</div>',
+            f'<div style="font-size:0.74rem;color:var(--text-muted);margin-bottom:6px">{esc(last_updated)}</div>'
+            '<div style="font-size:0.7rem;color:var(--text-muted);padding:6px 8px;border-radius:4px;'
+            'border:1px solid rgba(100,140,185,0.15);background:rgba(255,255,255,0.02);margin-bottom:8px">'
+            '← Sidebar\'ı kapattıysan sol kenarın üst köşesindeki <strong>&gt;</strong> okuna tıklayarak tekrar açabilirsin.'
+            '</div>',
             unsafe_allow_html=True,
         )
         st.divider()
@@ -177,11 +260,19 @@ def render_sidebar(data, brief, last_updated: str, health_summary: dict, prefere
         st.divider()
         st.markdown(
             '<div class="sidebar-note">'
-            'Sidebar yalnızca operasyon için ayrıldı: yenileme, dışa aktarma, sistem bilgisi. '
-            'Health ve canlı durum detayları ana yüzeydeki Status Hub\'a taşındı.'
+            'Operasyon: yenileme, export. Ayarlar ve alarmlar aşağıda.'
             '</div>',
             unsafe_allow_html=True,
         )
+        st.divider()
+        st.link_button(
+            "⬡ AGGR · Canlı Orderflow",
+            "https://aggr.trade/brutalbtc-copy-1",
+            use_container_width=True,
+        )
+        st.divider()
+        # ── Görünüm ve Uyarılar — sidebar'da kalıcı ──────────────────────────
+        _render_sidebar_preferences()
         st.divider()
         st.markdown(
             """**Veri Kaynakları**
