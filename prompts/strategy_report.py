@@ -154,16 +154,16 @@ Stil:
 
 Zorunlu cikti formati:
 <terminal_report>
-### SA Finance Alpha Makro Bülteni Giriş
-### Günlük Harita ve Ana Çıkarım
-### Makro Ortam ve Risk İştahı
-### BTC, Türev ve Order Book Analizi
+### SA Finance Alpha Makro Bulteni Giris
+### Gunluk Harita ve Ana Cikarim
+### Makro Ortam ve Risk Istahi
+### BTC, Turev ve Order Book Analizi
 ### ETF, Stablecoin ve Altcoinler
 ### Macro Breadth ve Crypto Breadth
-### Ekonomik Takvim ve Olası Etkiler
-### Önemli Haberler ve Piyasa Yorumu
+### Ekonomik Takvim ve Olasi Etkiler
+### Onemli Haberler ve Piyasa Yorumu
 ### Long / Short / Bekle ve Kritik Riskler
-### Kritik Seviyeler, Invalidation ve Bugün Ne İzlenmeli
+### Kritik Seviyeler, Invalidation ve Bugun Ne Izlenmeli
 </terminal_report>
 <x_lead>
 Tek postluk acilis metni. 280 karakteri gecmesin. Pazarlama dili kullanma; sabah notu gibi yaz.
@@ -265,10 +265,10 @@ Ek kurallar:
 - X thread'in her maddesinde en az bir sayi, oran veya kritik seviye bulunsun.
 - Terminal raporunda kritik seviyeleri dolar veya yuzde ile mutlaka yaz.
 - Invalidation bolumunde ne olursa gorusun bozulacagini net soyle.
-- "Günlük Harita ve Ana Çıkarım" bolumunde rejim, dominant driver, weakest link ve gunun temel davranis cizgisi ilk 5-6 satirda verilmis olsun.
+- "Gunluk Harita ve Ana Cikarim" bolumunde rejim, dominant driver, weakest link ve gunun temel davranis cizgisi ilk 5-6 satirda verilmis olsun.
 - "Long / Short / Bekle ve Kritik Riskler" bolumunde su uc kalip zorunlu: long icin anlamli kosul, short icin anlamli kosul, beklemek icin anlamli kosul.
-- "Makro Ortam ve Risk İştahı" bolumunde mutlaka DXY, US10Y, VIX, SP500, NASDAQ ve DAX, NIKKEI, GOLD, SILVER, OIL verilerini somut sayilarla kullan.
-- "BTC, Türev ve Order Book Analizi" bolumunde BTC 24s ve 7g hareketini, funding/OI/L-S/Taker verileriyle birlestir; kaldirac yogunlugu ve squeeze riskine yorum getir.
+- "Makro Ortam ve Risk Istahi" bolumunde mutlaka DXY, US10Y, VIX, SP500, NASDAQ ve DAX, NIKKEI, GOLD, SILVER, OIL verilerini somut sayilarla kullan.
+- "BTC, Turev ve Order Book Analizi" bolumunde BTC 24s ve 7g hareketini, funding/OI/L-S/Taker verileriyle birlestir; kaldirac yogunlugu ve squeeze riskine yorum getir.
 - "ETF, Stablecoin ve Altcoinler" bolumunde ETF akisi, stablecoin buyuklugu ve altcoinlerin 24s/7g performansini BTC ile goreli kiyaslayarak yaz.
 - "Macro Breadth ve Crypto Breadth" bolumunde skor tekrari yapmak yerine katilimin genis mi dar mi oldugunu, BTC disina yayilim olup olmadigini ve uyum/ayrisma durumunu anlat.
 """

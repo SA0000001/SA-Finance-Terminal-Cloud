@@ -960,9 +960,6 @@ def render_overview_tab(data, brief, analytics, alerts, health_summary):
     pos_band, pos_kind = build_positioning_emphasis(factors["positioning"], brief)
     ex_copy, ex_ctx, ex_badge, ex_kind = build_execution_bridge(scores, brief)
 
-    # Decision Bar — en üstte, her şeyden önce
-    render_decision_bar(analytics)
-
     # Hero zone: two columns — regime + command
     left, right = st.columns([1.15, 0.85])
     with left:
@@ -1610,14 +1607,6 @@ render_decision_bar(analytics)
 tabs = st.tabs(["Terminal", "Macro", "Sinyaller", "Raporlar", "Atlas"])
 with tabs[0]: render_overview_tab(data, brief, analytics, alerts, health_summary)
 with tabs[1]: render_macro_tab(data, analytics)
-<<<<<<< Updated upstream
-with tabs[2]: render_crypto_tab(data)
-with tabs[3]: render_flow_risk_tab(data, health_summary)
-with tabs[4]: render_aggr_tab()
-with tabs[5]: render_report_tab(client, data, brief, analytics, alerts, health_summary, preferences.get("report_depth", "Orta"))
-with tabs[6]: render_all_metrics_tab(data)
-=======
 with tabs[2]: render_signals_tab(data, health_summary)
 with tabs[3]: render_report_tab(client, data, brief, analytics, alerts, health_summary, preferences.get("report_depth", "Orta"))
 with tabs[4]: render_all_metrics_tab(data)
->>>>>>> Stashed changes
