@@ -89,10 +89,19 @@ def render_page_header(last_updated: str, health_summary: dict, brief: dict, pre
         unsafe_allow_html=True,
     )
     render_health_bar(health_summary)
-    st.markdown(
-        "<div class='section-notice'>Rejim merkezi → sekme detayları → atlas. Üst yüzey karar verir, alt yüzeyler teyit eder.</div>",
-        unsafe_allow_html=True,
-    )
+
+    # ── Sidebar menü butonu — her zaman görünür, sol üst köşede ──────────────
+    sb_col, notice_col = st.columns([0.12, 0.88])
+    with sb_col:
+        if st.button("☰ Menü", key="sidebar_open_btn", use_container_width=True, help="Yan menüyü görmek için tıkla"):
+            # query_params değiştirince Streamlit sayfayı expanded ile yeniler
+            st.query_params["sidebar"] = "open"
+            st.rerun()
+    with notice_col:
+        st.markdown(
+            "<div class='section-notice' style='margin-top:4px'>Rejim merkezi → sekme detayları → atlas. Üst yüzey karar verir, alt yüzeyler teyit eder.</div>",
+            unsafe_allow_html=True,
+        )
 
 
 # ─── STATUS HUB ──────────────────────────────────────────────────────────────
