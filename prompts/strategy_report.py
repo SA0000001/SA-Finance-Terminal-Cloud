@@ -146,7 +146,7 @@ Stil:
 - Her ana bolum 1 kisa paragraf ve gerekirse 2-4 kisa madde icersin
 - Ayni metrigi birden fazla bolumde uzun uzun tekrar etme
 - "Long / Short / Bekle" bolumunde net davranis kosullari ver
-- "Ekonomik Takvim" bolumunde en fazla 3 olay yaz
+- "Ekonomik Takvim" bolumunde en fazla 5 olay yaz
 - "Onemli Haberler" bolumunde en fazla 3 haber yaz
 - Ic analitik etiketleri rapora aynen kopyalama. "Fragile confidence", "Mixed overlay", "Neutral/Mixed" gibi ifadeleri dogrudan tekrar etme; bunlari dogal piyasa diliyle cevir.
 - Her ana bolumde siralama su olsun: veri -> yorum -> neden onemli.
@@ -259,7 +259,7 @@ Kaynak: {_safe(data.get('ECONOMIC_CALENDAR_SOURCE'))}
 
 Ek kurallar:
 - X lead ve X thread, terminal raporunun kisa yansimasi olmali; yeni hikaye uydurma.
-- X thread 5 madde olmali ve her madde tek paragraf olmali.
+- X thread 7 madde olmali ve her madde tek paragraf olmali.
 - X thread maddeleri su akisa bagli olsun: rejim, makro, BTC+turev, ETF/stablecoin/altcoin+breadth, seviyeler+invalidate.
 - X thread ve x lead icinde pazarlama dili, slogan veya promosyon kullanma.
 - X thread'in her maddesinde en az bir sayi, oran veya kritik seviye bulunsun.
