@@ -44,7 +44,7 @@ from ui.components import (
     render_info_panel,
     render_market_brief,
 )
-from ui.layout import normalize_health_cell, render_page_header, render_sidebar, render_status_hub
+from ui.layout import normalize_health_cell, render_page_header, render_sidebar
 from ui.theme import TERMINAL_CSS
 
 load_dotenv()
@@ -302,104 +302,6 @@ def render_onboarding_wizard():
             st.session_state["onboarding_done"] = True
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
-
-
-def render_preferences_panel(host, key_prefix: str = "prefs", *, expanded: bool = False):
-    preferences = st.session_state["preferences"]
-    with host.expander("Görünüm ve Uyarılar", expanded=expanded):
-        view_mode = host.radio(
-            "Görünüm modu",
-            ["Basit", "Pro"],
-            index=0 if preferences.get("view_mode") == "Basit" else 1,
-            key=f"{key_prefix}_view_mode",
-        )
-        report_depth = host.selectbox(
-            "Rapor seviyesi",
-            ["Kısa", "Orta", "Derin"],
-            index=["Kısa", "Orta", "Derin"].index(preferences.get("report_depth", "Orta")),
-            key=f"{key_prefix}_report_depth",
-        )
-        pinned_metrics = host.multiselect(
-            "Pinli metrikler",
-            options=list(METRIC_LABELS),
-            default=preferences.get("pinned_metrics", DEFAULT_PINNED_METRICS),
-            format_func=lambda key: METRIC_LABELS.get(key, key),
-            key=f"{key_prefix}_pinned_metrics",
-        )
-        funding_above = host.number_input("Funding > X",    value=float(preferences["thresholds"].get("funding_above", 0.01)), step=0.005, format="%.4f", key=f"{key_prefix}_funding_above")
-        vix_above     = host.number_input("VIX > Y",        value=float(preferences["thresholds"].get("vix_above", 25.0)),     step=0.5,   format="%.2f", key=f"{key_prefix}_vix_above")
-        etf_flow      = host.number_input("ETF netflow < Z", value=float(preferences["thresholds"].get("etf_flow_below", 0.0)), step=10.0,  format="%.1f", key=f"{key_prefix}_etf_flow_below")
-        dxy_above     = host.number_input("DXY > W",        value=float(preferences["thresholds"].get("dxy_above", 105.0)),    step=0.5,   format="%.2f", key=f"{key_prefix}_dxy_above")
-        if host.button("Ayarları Kaydet", key=f"{key_prefix}_save", use_container_width=True):
-            preferences["view_mode"]    = view_mode
-            preferences["report_depth"] = report_depth
-            preferences["pinned_metrics"] = pinned_metrics[:8]
-            preferences["thresholds"] = {
-                "funding_above": funding_above,
-                "vix_above": vix_above,
-                "etf_flow_below": etf_flow,
-                "dxy_above": dxy_above,
-            }
-            save_preferences(preferences)
-            st.session_state["preferences"] = preferences
-            host.success("Ayarlar kaydedildi.")
-
-
-# ─── CONTROL RAIL ────────────────────────────────────────────────────────────
-
-def render_control_rail(data: dict, brief: dict, last_updated: str, health_summary: dict, alerts: list[dict]):
-    rail_open = st.session_state.get("control_rail_open", True)
-    tb_left, tb_mid, tb_right = st.columns([1.0, 0.9, 2.6])
-    with tb_left:
-        if st.button("Paneli gizle" if rail_open else "Paneli göster", key="toggle_control_rail", use_container_width=True):
-            st.session_state["control_rail_open"] = not rail_open
-            st.rerun()
-    with tb_mid:
-        if st.button("Verileri yenile", key="refresh_main_control", use_container_width=True):
-            st.cache_data.clear()
-            st.rerun()
-    with tb_right:
-        st.markdown(
-            f'<div style="font-size:0.8rem;color:var(--text-muted);padding-top:8px">'
-            f'Operasyon paneli · Son güncelleme: {esc(last_updated)} · Odak: {esc(brief["focus"]["detail"])}'
-            f'</div>',
-            unsafe_allow_html=True,
-        )
-
-    if not st.session_state.get("control_rail_open", True):
-        st.markdown(
-            "<div class='section-notice'>Operasyon paneli gizli. Yukarıdaki buton ile tekrar açabilirsin.</div>",
-            unsafe_allow_html=True,
-        )
-        return
-
-    col_ops, col_prefs = st.columns([1.0, 1.1])
-    with col_ops:
-        st.markdown(
-            '<div class="s-kicker" style="margin-bottom:8px">Operasyon</div>',
-            unsafe_allow_html=True,
-        )
-        export_df = pd.DataFrame(
-            [(k, v) for k, v in data.items() if k not in {"NEWS", "_health"}],
-            columns=["Metrik", "Deger"],
-        )
-        st.download_button(
-            "CSV İndir",
-            export_df.to_csv(index=False, sep=";").encode("utf-8-sig"),
-            file_name=f"AlphaTerminal_{pd.Timestamp.now().strftime('%Y%m%d_%H%M')}.csv",
-            mime="text/csv",
-            key="download_main_control",
-            use_container_width=True,
-        )
-        st.markdown(
-            f'<div class="alert-item" style="margin-top:10px">'
-            f'<strong>Özet</strong>'
-            f'<span>Rejim: {esc(brief["regime"]["title"])} · Aktif alarm: {len(alerts)}</span>'
-            f'</div>',
-            unsafe_allow_html=True,
-        )
-    with col_prefs:
-        render_preferences_panel(st, key_prefix="main_control", expanded=True)
 
 
 # ─── SIGNAL DECK ─────────────────────────────────────────────────────────────
@@ -1590,15 +1492,33 @@ if not st.session_state.get("onboarding_done", False):
     render_onboarding_wizard()
     st.stop()
 
-render_status_hub(last_updated, health_summary, alerts, analytics)
-render_sidebar(data, brief, last_updated, health_summary, preferences, alerts)
-render_control_rail(data, brief, last_updated, health_summary, alerts)
+# ─── Sidebar — tüm operasyon, status, ayarlar burada ────────────────────────
+render_sidebar(data, brief, last_updated, health_summary, preferences, alerts, analytics=analytics)
 
-# ─── Sidebar kapalıysa ana alanda "Menüyü Aç" butonu göster ─────────────────
-# Streamlit sidebar'ı JS ile kontrol etmek mümkün değil; bunun yerine
-# sidebar içinde her zaman görünür bir "Sidebar açık" işareti koyuyoruz.
-# Kullanıcı sidebar'ı kapattığında Streamlit'in kendi açma okunu kullanabilir,
-# ama bunu daha belirgin yapmak için sidebar'ın en üstüne sabit bir ipucu ekliyoruz.
+# ─── Sidebar kapalıysa JS ile otomatik aç ────────────────────────────────────
+# Streamlit sidebar'ın data-testid'si "stSidebar". Kapalıyken köşedeki
+# chevron butonuna JS ile tıklatarak sidebar'ı açık tutuyoruz.
+st.markdown(
+    """<script>
+    (function() {
+        function openSidebar() {
+            var sidebar = window.parent.document.querySelector('[data-testid="stSidebar"]');
+            if (!sidebar) return;
+            var collapsed = sidebar.getAttribute('aria-expanded') === 'false'
+                         || sidebar.classList.contains('st-emotion-cache-hidden')
+                         || getComputedStyle(sidebar).transform.includes('-');
+            if (collapsed) {
+                var btn = window.parent.document.querySelector('[data-testid="collapsedControl"]');
+                if (btn) btn.click();
+            }
+        }
+        // Sayfa yüklenince kontrol et
+        setTimeout(openSidebar, 800);
+        setTimeout(openSidebar, 2000);
+    })();
+    </script>""",
+    unsafe_allow_html=True,
+)
 
 # ─── Decision Bar — tüm sekmeler üstünde global ──────────────────────────────
 render_decision_bar(analytics)

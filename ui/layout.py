@@ -226,53 +226,85 @@ def _render_sidebar_preferences():
             st.success("Ayarlar kaydedildi.")
 
 
-def render_sidebar(data, brief, last_updated: str, health_summary: dict, preferences: dict, alerts: list[dict]):
+def render_sidebar(data, brief, last_updated: str, health_summary: dict, preferences: dict, alerts: list[dict], analytics: dict | None = None):
     with st.sidebar:
+        # ── Başlık + zaman ────────────────────────────────────────────────────
         st.markdown(
-            '<div class="s-kicker" style="margin-bottom:6px">SA Finance Terminal</div>'
-            '<div style="font-size:0.92rem;font-weight:700;color:var(--text-primary);margin-bottom:4px">Control Rail</div>'
-            f'<div style="font-size:0.74rem;color:var(--text-muted);margin-bottom:6px">{esc(last_updated)}</div>'
-            '<div style="font-size:0.7rem;color:var(--text-muted);padding:6px 8px;border-radius:4px;'
-            'border:1px solid rgba(100,140,185,0.15);background:rgba(255,255,255,0.02);margin-bottom:8px">'
-            '← Sidebar\'ı kapattıysan sol kenarın üst köşesindeki <strong>&gt;</strong> okuna tıklayarak tekrar açabilirsin.'
-            '</div>',
+            '<div class="s-kicker" style="margin-bottom:4px">SA Finance Terminal</div>'
+            f'<div style="font-size:0.74rem;color:var(--text-muted);margin-bottom:4px">{esc(last_updated)}</div>',
             unsafe_allow_html=True,
         )
+
+        # ── Operasyon butonları ───────────────────────────────────────────────
+        b1, b2 = st.columns(2)
+        with b1:
+            if st.button("Verileri Yenile", key="sidebar_refresh", use_container_width=True):
+                st.cache_data.clear()
+                st.rerun()
+        with b2:
+            export_df = pd.DataFrame(
+                [(k, v) for k, v in data.items() if k not in {"NEWS", "_health"}],
+                columns=["Metrik", "Deger"],
+            )
+            st.download_button(
+                "CSV İndir",
+                export_df.to_csv(index=False, sep=";").encode("utf-8-sig"),
+                file_name=f"AlphaTerminal_{pd.Timestamp.now().strftime('%Y%m%d_%H%M')}.csv",
+                mime="text/csv",
+                key="sidebar_csv_download",
+                use_container_width=True,
+            )
+
         st.divider()
 
-        if st.button("Verileri Yenile", key="sidebar_refresh", use_container_width=True):
-            st.cache_data.clear()
-            st.rerun()
+        # ── Operasyon Merkezi (status hub) ────────────────────────────────────
+        scores      = (analytics or {}).get("scores", {})
+        confidence  = scores.get("confidence", "-") if scores else "-"
+        issue_rows  = [r for r in health_summary.get("rows", []) if r.get("Durum") != "OK"]
+        issue_count = len(issue_rows)
+        alert_count = len(alerts)
 
-        export_df = pd.DataFrame(
-            [(k, v) for k, v in data.items() if k not in {"NEWS", "_health"}],
-            columns=["Metrik", "Deger"],
-        )
-        st.download_button(
-            "CSV İndir",
-            export_df.to_csv(index=False, sep=";").encode("utf-8-sig"),
-            file_name=f"AlphaTerminal_{pd.Timestamp.now().strftime('%Y%m%d_%H%M')}.csv",
-            mime="text/csv",
-            key="sidebar_csv_download",
-            use_container_width=True,
-        )
-
-        st.divider()
         st.markdown(
-            '<div class="sidebar-note">'
-            'Operasyon: yenileme, export. Ayarlar ve alarmlar aşağıda.'
-            '</div>',
+            f'<div style="font-size:0.78rem;font-weight:600;color:var(--text-primary);margin-bottom:4px">Operasyon Merkezi</div>'
+            f'<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:6px">'
+            f'<span style="font-size:0.7rem;color:var(--text-muted)">Alarmlar <strong style="color:var(--text-primary)">{alert_count}</strong></span>'
+            f'<span style="font-size:0.7rem;color:var(--text-muted)">Sorunlar <strong style="color:{"var(--negative)" if issue_count else "var(--positive)"}">{issue_count}</strong></span>'
+            f'<span style="font-size:0.7rem;color:var(--text-muted)">Güven <strong style="color:var(--text-primary)">{confidence}/100</strong></span>'
+            f'</div>',
             unsafe_allow_html=True,
         )
+
+        if issue_rows:
+            with st.expander(f"Veri kaynağı sorunları ({issue_count})", expanded=False):
+                for row in issue_rows[:6]:
+                    source    = normalize_health_cell(row.get("Kaynak"))
+                    raw_error = normalize_health_cell(row.get("Hata"))
+                    error     = friendly_error(raw_error)
+                    st.markdown(
+                        f"<div style='font-size:0.78rem;font-weight:600;margin-bottom:1px'>{_html.escape(source)}</div>"
+                        f"<div style='font-size:0.72rem;color:var(--text-muted);margin-bottom:6px'>{_html.escape(error)}</div>",
+                        unsafe_allow_html=True,
+                    )
+        else:
+            st.markdown(
+                '<div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:4px">Veri sorunu yok.</div>',
+                unsafe_allow_html=True,
+            )
+
         st.divider()
+
+        # ── AGGR linki ────────────────────────────────────────────────────────
         st.link_button(
             "⬡ AGGR · Canlı Orderflow",
             "https://aggr.trade/brutalbtc-copy-1",
             use_container_width=True,
         )
+
         st.divider()
-        # ── Görünüm ve Uyarılar — sidebar'da kalıcı ──────────────────────────
+
+        # ── Görünüm ve Uyarılar ───────────────────────────────────────────────
         _render_sidebar_preferences()
+
         st.divider()
         st.markdown(
             """**Veri Kaynakları**
