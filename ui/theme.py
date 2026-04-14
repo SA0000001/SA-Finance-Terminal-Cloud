@@ -1282,5 +1282,36 @@ html, body,
     .t-state-chips { display: grid; }
     .regime-score-num { font-size: 3rem; }
 }
+
+/* ── Sidebar toggle butonu — her zaman görünür ────────────────────────── */
+/* Kapalıyken sol kenarda beliren chevron butonu */
+[data-testid="collapsedControl"] {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    width: 28px !important;
+    height: 60px !important;
+    background: rgba(0, 170, 255, 0.18) !important;
+    border: 1px solid rgba(0, 170, 255, 0.45) !important;
+    border-radius: 0 6px 6px 0 !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    position: fixed !important;
+    left: 0 !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    z-index: 999999 !important;
+    transition: background 0.2s, border-color 0.2s !important;
+}
+[data-testid="collapsedControl"]:hover {
+    background: rgba(0, 170, 255, 0.32) !important;
+    border-color: rgba(0, 170, 255, 0.75) !important;
+}
+[data-testid="collapsedControl"] svg {
+    color: rgba(0, 170, 255, 0.9) !important;
+    width: 16px !important;
+    height: 16px !important;
+}
 </style>
 """
