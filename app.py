@@ -60,6 +60,10 @@ st.set_page_config(
 )
 st.markdown(TERMINAL_CSS, unsafe_allow_html=True)
 
+# ── Menü butonuna basılınca sidebar'ı expanded olarak yeniden yükle ──────────
+if st.query_params.get("sidebar") == "open":
+    st.query_params.clear()  # parametreyi temizle, sidebar expanded kalır
+
 # ─── DATA SECTION CONFIGS ────────────────────────────────────────────────────
 
 MACRO_MARKET_SECTIONS = [
@@ -1494,44 +1498,6 @@ if not st.session_state.get("onboarding_done", False):
 
 # ─── Sidebar — tüm operasyon, status, ayarlar burada ────────────────────────
 render_sidebar(data, brief, last_updated, health_summary, preferences, alerts, analytics=analytics)
-
-# ─── Sidebar auto-open JS ────────────────────────────────────────────────────
-# collapsedControl butonunu CSS ile zaten görünür yaptık (theme.py).
-# Ek olarak sayfa yüklenince sidebar kapalıysa otomatik aç.
-st.markdown(
-    """<script>
-    (function tryOpen() {
-        try {
-            var doc = window.parent.document;
-            // Sidebar kapalı mı kontrol et
-            var sidebar = doc.querySelector('[data-testid="stSidebar"]');
-            var collapsed = doc.querySelector('[data-testid="collapsedControl"]');
-            if (collapsed && sidebar) {
-                var style = window.parent.getComputedStyle(sidebar);
-                var isHidden = style.transform && style.transform !== 'none' && style.transform.includes('matrix');
-                if (isHidden || sidebar.getAttribute('aria-expanded') === 'false') {
-                    collapsed.click();
-                }
-            }
-        } catch(e) {}
-    })();
-    // Sayfa tamamen yüklendikten sonra tekrar dene
-    window.addEventListener('load', function() {
-        setTimeout(function() {
-            try {
-                var doc = window.parent.document;
-                var collapsed = doc.querySelector('[data-testid="collapsedControl"]');
-                var sidebar   = doc.querySelector('[data-testid="stSidebar"]');
-                if (collapsed && sidebar) {
-                    var rect = sidebar.getBoundingClientRect();
-                    if (rect.width < 50) { collapsed.click(); }
-                }
-            } catch(e) {}
-        }, 600);
-    });
-    </script>""",
-    unsafe_allow_html=True,
-)
 
 # ─── Decision Bar — tüm sekmeler üstünde global ──────────────────────────────
 render_decision_bar(analytics)
