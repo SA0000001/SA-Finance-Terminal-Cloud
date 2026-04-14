@@ -1495,27 +1495,40 @@ if not st.session_state.get("onboarding_done", False):
 # ─── Sidebar — tüm operasyon, status, ayarlar burada ────────────────────────
 render_sidebar(data, brief, last_updated, health_summary, preferences, alerts, analytics=analytics)
 
-# ─── Sidebar kapalıysa JS ile otomatik aç ────────────────────────────────────
-# Streamlit sidebar'ın data-testid'si "stSidebar". Kapalıyken köşedeki
-# chevron butonuna JS ile tıklatarak sidebar'ı açık tutuyoruz.
+# ─── Sidebar auto-open JS ────────────────────────────────────────────────────
+# collapsedControl butonunu CSS ile zaten görünür yaptık (theme.py).
+# Ek olarak sayfa yüklenince sidebar kapalıysa otomatik aç.
 st.markdown(
     """<script>
-    (function() {
-        function openSidebar() {
-            var sidebar = window.parent.document.querySelector('[data-testid="stSidebar"]');
-            if (!sidebar) return;
-            var collapsed = sidebar.getAttribute('aria-expanded') === 'false'
-                         || sidebar.classList.contains('st-emotion-cache-hidden')
-                         || getComputedStyle(sidebar).transform.includes('-');
-            if (collapsed) {
-                var btn = window.parent.document.querySelector('[data-testid="collapsedControl"]');
-                if (btn) btn.click();
+    (function tryOpen() {
+        try {
+            var doc = window.parent.document;
+            // Sidebar kapalı mı kontrol et
+            var sidebar = doc.querySelector('[data-testid="stSidebar"]');
+            var collapsed = doc.querySelector('[data-testid="collapsedControl"]');
+            if (collapsed && sidebar) {
+                var style = window.parent.getComputedStyle(sidebar);
+                var isHidden = style.transform && style.transform !== 'none' && style.transform.includes('matrix');
+                if (isHidden || sidebar.getAttribute('aria-expanded') === 'false') {
+                    collapsed.click();
+                }
             }
-        }
-        // Sayfa yüklenince kontrol et
-        setTimeout(openSidebar, 800);
-        setTimeout(openSidebar, 2000);
+        } catch(e) {}
     })();
+    // Sayfa tamamen yüklendikten sonra tekrar dene
+    window.addEventListener('load', function() {
+        setTimeout(function() {
+            try {
+                var doc = window.parent.document;
+                var collapsed = doc.querySelector('[data-testid="collapsedControl"]');
+                var sidebar   = doc.querySelector('[data-testid="stSidebar"]');
+                if (collapsed && sidebar) {
+                    var rect = sidebar.getBoundingClientRect();
+                    if (rect.width < 50) { collapsed.click(); }
+                }
+            } catch(e) {}
+        }, 600);
+    });
     </script>""",
     unsafe_allow_html=True,
 )
