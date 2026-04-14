@@ -60,9 +60,45 @@ st.set_page_config(
 )
 st.markdown(TERMINAL_CSS, unsafe_allow_html=True)
 
-# ── Menü butonuna basılınca sidebar'ı expanded olarak yeniden yükle ──────────
-if st.query_params.get("sidebar") == "open":
-    st.query_params.clear()  # parametreyi temizle, sidebar expanded kalır
+# ── Floating sidebar toggle (her scroll pozisyonunda görünür, rerun yok) ─────
+st.markdown("""
+<div id="sa-sidebar-toggle" title="Menüyü aç / kapat" onclick="saSidebarToggle()">
+  <svg width="10" height="16" viewBox="0 0 10 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M7 2L2 8L7 14" stroke="#52c8ff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+</div>
+<script>
+(function() {
+  function saSidebarToggle() {
+    var parent = window.parent.document;
+    // Streamlit'in kendi collapse/expand butonunu bul
+    var btn = parent.querySelector('[data-testid="collapsedControl"]');
+    if (!btn) {
+      // Fallback: sidebar içindeki chevron butonu
+      var sidebar = parent.querySelector('[data-testid="stSidebar"]');
+      if (sidebar) btn = sidebar.querySelector('button');
+    }
+    if (btn) btn.click();
+    // İkon yönünü güncelle
+    var toggle = document.getElementById('sa-sidebar-toggle');
+    if (toggle) toggle.classList.toggle('sidebar-open');
+  }
+  window.saSidebarToggle = saSidebarToggle;
+
+  // Başlangıç state senkronizasyonu
+  setTimeout(function() {
+    var parent = window.parent.document;
+    var sidebar = parent.querySelector('[data-testid="stSidebar"]');
+    var toggle = document.getElementById('sa-sidebar-toggle');
+    if (sidebar && toggle) {
+      // Sidebar genişliği varsa açık demektir
+      var w = sidebar.getBoundingClientRect().width;
+      if (w > 50) toggle.classList.add('sidebar-open');
+    }
+  }, 500);
+})();
+</script>
+""", unsafe_allow_html=True)
 
 # ─── DATA SECTION CONFIGS ────────────────────────────────────────────────────
 
