@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from io import BytesIO
 
@@ -30,6 +30,32 @@ METRIC_LABELS = {
     "SOL_P": "SOL fiyat",
     "DXY": "DXY",
     "FED": "FED",
+    "CSI300": "CSI 300",
+}
+
+# Metrik baÅŸvuru eÅŸikleri â€” data table card'larda baÄŸlam notu olarak gÃ¶sterilir
+METRIC_CONTEXT: dict[str, str] = {
+    "FR":              "NÃ¶tr: 0% Â· Dikkat: >+0.01% Â· AÅŸÄ±rÄ±: >+0.03%",
+    "FNG":             "AÅŸÄ±rÄ± Korku: 0â€“24 Â· Korku: 25â€“44 Â· NÃ¶tr: 45â€“55 Â· AÃ§gÃ¶zlÃ¼lÃ¼k: 56â€“74 Â· AÅŸÄ±rÄ±: 75â€“100",
+    "VIX":             "Normal: <20 Â· EndiÅŸe: 20â€“30 Â· Korku: 30â€“40 Â· Panik: >40",
+    "ETF_FLOW_TOTAL":  "GÃ¼Ã§lÃ¼ GiriÅŸ: >500M Â· GiriÅŸ: >0 Â· Ã‡Ä±kÄ±ÅŸ: <0 Â· GÃ¼Ã§lÃ¼ Ã‡Ä±kÄ±ÅŸ: <-200M",
+    "USDT_D":          "DÃ¼ÅŸÃ¼k (risk-on): <4% Â· NÃ¶tr: 4â€“6% Â· YÃ¼ksek (risk-off): >6%",
+    "STABLE_C_D":      "Pozitif: piyasaya stablecoin giriyor Â· Negatif: stablecoin Ã§ekiliyor",
+    "OI":              "YÃ¼kselen OI + yÃ¼kselen fiyat: saÄŸlÄ±klÄ±. YÃ¼kselen OI + dÃ¼ÅŸen fiyat: dikkat.",
+    "DXY":             "GÃ¼Ã§lÃ¼ DXY genellikle kripto iÃ§in baskÄ±cÄ±. ZayÄ±f DXY risk-on ortamÄ± destekler.",
+    "US10Y":           "HÄ±zlÄ± yÃ¼kseliÅŸ likiditeyi sÄ±kar. >4.5% seviyeleri risk varlÄ±klarÄ± iÃ§in baskÄ±.",
+    "CSI300":          "Ã‡in hisse endeksindeki yÃ¶n kÃ¼resel risk iÅŸtahÄ± iÃ§in Asya teyidi saÄŸlar.",
+    "M2":              "M2 YoY artÄ±ÅŸÄ± likidite geniÅŸlemesine iÅŸaret eder; kripto iÃ§in tarihsel olarak pozitif.",
+    "Dom":             "BTC Dom artÄ±ÅŸÄ±: altcoin riskten kaÃ§Ä±ÅŸ. DÃ¼ÅŸÃ¼ÅŸ: altcoin sezonuna geÃ§iÅŸ sinyali.",
+    "ETH_Dom":         "ETH dom gÃ¼Ã§leniyorsa ETH liderliÄŸi; zayÄ±flÄ±yorsa BTC veya altcoin rotasyonu.",
+    "LS_Ratio":        "L/S >1: uzun pozisyon aÄŸÄ±rlÄ±klÄ±. <1: short aÄŸÄ±rlÄ±klÄ±. AÅŸÄ±rÄ± uÃ§lar dikkat sinyali.",
+    "Sup_Wall":        "Mevcut fiyatÄ±n altÄ±ndaki en gÃ¼Ã§lÃ¼ alÄ±m duvarÄ± seviyesi.",
+    "Res_Wall":        "Mevcut fiyatÄ±n Ã¼stÃ¼ndeki en gÃ¼Ã§lÃ¼ satÄ±ÅŸ duvarÄ± seviyesi.",
+    "Hash":            "Hashrate artÄ±ÅŸÄ± madenci gÃ¼venini ve aÄŸ saÄŸlÄ±ÄŸÄ±nÄ± gÃ¶sterir.",
+    "Active":          "Aktif adres artÄ±ÅŸÄ± on-chain kullanÄ±m ve talep artÄ±ÅŸÄ±na iÅŸaret eder.",
+    "TOTAL_CAP":       "TÃ¼m kripto piyasa deÄŸeri. Yeni ATH yaklaÅŸÄ±mÄ± geniÅŸ katÄ±lÄ±mÄ± gÃ¶sterir.",
+    "TOTAL2_CAP":      "BTC hariÃ§ kripto piyasa deÄŸeri. Altcoin sezonu gÃ¶stergesi.",
+    "TOTAL3_CAP":      "BTC ve ETH hariÃ§. KÃ¼Ã§Ã¼k/orta cap katÄ±lÄ±mÄ±nÄ± Ã¶lÃ§er.",
 }
 
 
@@ -39,6 +65,10 @@ def clamp_score(value: float) -> int:
 
 def _display(value) -> str:
     return str(value) if value not in (None, "", PLACEHOLDER) else PLACEHOLDER
+
+
+def _is_placeholder(value) -> bool:
+    return value in (None, "", PLACEHOLDER)
 
 
 def _linear_score(value: float | None, low: float, high: float, *, inverse: bool = False) -> int:
@@ -143,7 +173,9 @@ def _confidence_label(score: int) -> str:
     return "Low confidence"
 
 
-def _regime_confidence_score(factors: dict[str, dict], overall: int, fragility: dict, invalidate_conditions: list[str]) -> int:
+def _regime_confidence_score(
+    factors: dict[str, dict], overall: int, fragility: dict, invalidate_conditions: list[str]
+) -> int:
     data_confidence = sum(factor["confidence"] * factor["weight"] for factor in factors.values())
     dominant_factor = max(factors.values(), key=lambda factor: factor["contribution"])
     weakest_factor = min(factors.values(), key=lambda factor: factor["score"])
@@ -152,42 +184,78 @@ def _regime_confidence_score(factors: dict[str, dict], overall: int, fragility: 
     crypto_breadth = participation["subfactors"]["crypto"]["score"]
     alignment_gap = abs(macro_breadth - crypto_breadth)
 
-    regime_clarity = clamp_score((abs(overall - 50) * 1.7) + ((dominant_factor["score"] - weakest_factor["score"]) * 0.45))
-    alignment_score = clamp_score(100 - (alignment_gap * 2.8))
-    stability_mix = clamp_score((factors["volatility"]["score"] * 0.55) + (factors["positioning"]["score"] * 0.45))
+    regime_clarity = clamp_score(
+        (abs(overall - 50) * 1.25) + ((dominant_factor["score"] - weakest_factor["score"]) * 0.28)
+    )
+    driver_strength = clamp_score(
+        ((dominant_factor["score"] - 50) * 1.35) + ((dominant_factor["contribution"] / dominant_factor["weight"]) - 45)
+    )
+    alignment_score = clamp_score(100 - (alignment_gap * 3.4))
+    stability_mix = clamp_score((factors["volatility"]["score"] * 0.58) + (factors["positioning"]["score"] * 0.42))
 
     raw_score = (
-        (data_confidence * 0.34)
-        + (regime_clarity * 0.22)
+        (data_confidence * 0.24)
+        + (regime_clarity * 0.18)
+        + (driver_strength * 0.12)
         + (alignment_score * 0.14)
         + (stability_mix * 0.20)
-        + (factors["liquidity"]["score"] * 0.10)
+        + (factors["liquidity"]["score"] * 0.12)
     )
 
-    fragility_penalty = max(0.0, (fragility["score"] - 24) * 0.52)
-    weakest_penalty = max(0.0, (55 - weakest_factor["score"]) * 0.48)
-    invalidate_penalty = max(0.0, len(invalidate_conditions) - 1) * 3.5
-    calibrated = raw_score - fragility_penalty - weakest_penalty - invalidate_penalty
+    weakest_penalty = max(0.0, (56 - weakest_factor["score"]) * 0.58)
+    fragility_penalty = max(0.0, (fragility["score"] - 22) * 0.56)
+    crowding_penalty = max(0.0, (62 - factors["positioning"]["score"]) * 0.44)
+    volatility_penalty = max(0.0, (60 - factors["volatility"]["score"]) * 0.26)
+    alignment_penalty = max(0.0, (alignment_gap - 12) * 0.45)
+    invalidate_penalty = max(0.0, len(invalidate_conditions) - 1) * 4.5
+    invalidate_proximity_penalty = 0.0
+    if factors["liquidity"]["score"] < 58:
+        invalidate_proximity_penalty += 3.0
+    if factors["volatility"]["score"] < 60:
+        invalidate_proximity_penalty += 3.0
+    if factors["positioning"]["score"] < 58:
+        invalidate_proximity_penalty += 4.0
+    if macro_breadth < 55:
+        invalidate_proximity_penalty += 2.0
+    if crypto_breadth < 55:
+        invalidate_proximity_penalty += 2.0
+    if alignment_gap >= 18:
+        invalidate_proximity_penalty += 2.5
 
-    cap = 88
-    if fragility["score"] >= 70:
-        cap = 54
-    elif fragility["score"] >= 58 or factors["positioning"]["score"] < 45:
-        cap = 66
-    elif weakest_factor["score"] < 48 or alignment_gap >= 18:
+    calibrated = (
+        raw_score
+        - weakest_penalty
+        - fragility_penalty
+        - crowding_penalty
+        - volatility_penalty
+        - alignment_penalty
+        - invalidate_penalty
+        - invalidate_proximity_penalty
+    )
+
+    cap = 84
+    if overall < 72:
+        cap = 80
+    if overall < 62:
         cap = 74
-    elif overall <= 45:
-        cap = 72
+    if weakest_factor["score"] < 56 or fragility["score"] >= 38:
+        cap = min(cap, 70)
+    if factors["positioning"]["score"] < 56 or alignment_gap >= 18:
+        cap = min(cap, 66)
+    if fragility["score"] >= 55 or factors["positioning"]["score"] < 48 or weakest_factor["score"] < 48:
+        cap = min(cap, 58)
+    if fragility["score"] >= 70 or factors["positioning"]["score"] < 40 or weakest_factor["score"] < 40:
+        cap = min(cap, 48)
 
     return clamp_score(min(calibrated, cap))
 
 
 def _regime_confidence_label(score: int, fragility_score: int) -> str:
-    if fragility_score >= 65 or score < 42:
+    if fragility_score >= 65 or score < 30:
         return "Fragile confidence"
-    if fragility_score >= 48 or score < 60:
+    if fragility_score >= 45 or score < 55:
         return "Conditional confidence"
-    if score < 78:
+    if score < 74:
         return "Moderate confidence"
     return "High confidence"
 
@@ -202,16 +270,50 @@ def _build_liquidity_factor(data: dict) -> dict:
     usdt_d = parse_number(data.get("USDT_D"))
 
     metrics = [
-        {"label": "ETF akislari", "display": _display(data.get("ETF_FLOW_TOTAL")), "score": _linear_score(etf_flow, -250, 250), "weight": 0.30},
-        {"label": "DXY seviyesi", "display": _display(data.get("DXY")), "score": _linear_score(dxy, 96, 106, inverse=True), "weight": 0.16},
-        {"label": "DXY trendi", "display": _display(data.get("DXY_C")), "score": _trend_score(dxy_change, favorable_up=False, scale=1.2), "weight": 0.10},
-        {"label": "US10Y", "display": _display(data.get("US10Y")), "score": _linear_score(us10y, 3.4, 5.2, inverse=True), "weight": 0.14},
-        {"label": "Yield trendi", "display": _display(data.get("US10Y_C")), "score": _trend_score(us10y_change, favorable_up=False, scale=2.0), "weight": 0.08},
-        {"label": "Stable.C.D", "display": _display(data.get("STABLE_C_D")), "score": _linear_score(stable_cd, 6.0, 15.0, inverse=True), "weight": 0.10},
-        {"label": "USDT.D", "display": _display(data.get("USDT_D")), "score": _linear_score(usdt_d, 4.5, 9.0, inverse=True), "weight": 0.12},
+        {
+            "label": "ETF akislari",
+            "display": _display(data.get("ETF_FLOW_TOTAL")),
+            "score": _linear_score(etf_flow, -250, 250),
+            "weight": 0.30,
+        },
+        {
+            "label": "DXY seviyesi",
+            "display": _display(data.get("DXY")),
+            "score": _linear_score(dxy, 96, 106, inverse=True),
+            "weight": 0.16,
+        },
+        {
+            "label": "DXY trendi",
+            "display": _display(data.get("DXY_C")),
+            "score": _trend_score(dxy_change, favorable_up=False, scale=1.2),
+            "weight": 0.10,
+        },
+        {
+            "label": "US10Y",
+            "display": _display(data.get("US10Y")),
+            "score": _linear_score(us10y, 3.4, 5.2, inverse=True),
+            "weight": 0.14,
+        },
+        {
+            "label": "Yield trendi",
+            "display": _display(data.get("US10Y_C")),
+            "score": _trend_score(us10y_change, favorable_up=False, scale=2.0),
+            "weight": 0.08,
+        },
+        {
+            "label": "Stable.C.D",
+            "display": _display(data.get("STABLE_C_D")),
+            "score": _linear_score(stable_cd, 6.0, 15.0, inverse=True),
+            "weight": 0.10,
+        },
+        {
+            "label": "USDT.D",
+            "display": _display(data.get("USDT_D")),
+            "score": _linear_score(usdt_d, 4.5, 9.0, inverse=True),
+            "weight": 0.12,
+        },
     ]
     score = _weighted_metric_score(metrics)
-    confidence = _confidence_score(metrics)
     trend_mix = clamp_score(
         (_trend_score(dxy_change, favorable_up=False, scale=1.2) * 0.4)
         + (_trend_score(us10y_change, favorable_up=False, scale=2.0) * 0.3)
@@ -241,11 +343,36 @@ def _build_volatility_factor(data: dict) -> dict:
     accel = abs((btc_change or 0.0) - ((btc_7d or 0.0) / 7))
 
     metrics = [
-        {"label": "VIX seviyesi", "display": _display(data.get("VIX")), "score": _linear_score(vix, 12, 40, inverse=True), "weight": 0.42},
-        {"label": "VIX trendi", "display": _display(data.get("VIX_C")), "score": _trend_score(vix_change, favorable_up=False, scale=6.0), "weight": 0.12},
-        {"label": "BTC 24s oynaklik", "display": _display(data.get("BTC_C")), "score": _linear_score(abs(btc_change) if btc_change is not None else None, 0.5, 8.0, inverse=True), "weight": 0.24},
-        {"label": "BTC 7g hareketi", "display": _display(data.get("BTC_7D")), "score": _linear_score(abs(btc_7d) if btc_7d is not None else None, 2.0, 18.0, inverse=True), "weight": 0.14},
-        {"label": "Vol hizlanmasi", "display": f"{accel:.2f}%" if accel else PLACEHOLDER, "score": _linear_score(accel, 0.4, 5.0, inverse=True), "weight": 0.08},
+        {
+            "label": "VIX seviyesi",
+            "display": _display(data.get("VIX")),
+            "score": _linear_score(vix, 12, 40, inverse=True),
+            "weight": 0.42,
+        },
+        {
+            "label": "VIX trendi",
+            "display": _display(data.get("VIX_C")),
+            "score": _trend_score(vix_change, favorable_up=False, scale=6.0),
+            "weight": 0.12,
+        },
+        {
+            "label": "BTC 24s oynaklik",
+            "display": _display(data.get("BTC_C")),
+            "score": _linear_score(abs(btc_change) if btc_change is not None else None, 0.5, 8.0, inverse=True),
+            "weight": 0.24,
+        },
+        {
+            "label": "BTC 7g hareketi",
+            "display": _display(data.get("BTC_7D")),
+            "score": _linear_score(abs(btc_7d) if btc_7d is not None else None, 2.0, 18.0, inverse=True),
+            "weight": 0.14,
+        },
+        {
+            "label": "Vol hizlanmasi",
+            "display": f"{accel:.2f}%" if accel else PLACEHOLDER,
+            "score": _linear_score(accel, 0.4, 5.0, inverse=True),
+            "weight": 0.08,
+        },
     ]
     score = _weighted_metric_score(metrics)
     trend_mix = clamp_score(
@@ -282,11 +409,36 @@ def _build_positioning_factor(data: dict) -> dict:
         divergence_score = 62
 
     metrics = [
-        {"label": "Funding dengesi", "display": _display(data.get("FR")), "score": _balance_score(funding, 0.0, 0.006, 0.03), "weight": 0.30},
-        {"label": "L/S dengesi", "display": _display(data.get("LS_Ratio")), "score": _balance_score(ls_ratio, 1.0, 0.10, 0.55), "weight": 0.24},
-        {"label": "Taker akis", "display": _display(data.get("Taker")), "score": _balance_score(taker, 1.0, 0.05, 0.30), "weight": 0.20},
-        {"label": "Open interest", "display": _display(data.get("OI")), "score": _linear_score(open_interest, 1_800_000, 3_800_000, inverse=True), "weight": 0.16},
-        {"label": "Fiyat-akis uyumu", "display": f"BTC { _display(data.get('BTC_C')) } | ETF { _display(data.get('ETF_FLOW_TOTAL')) }", "score": divergence_score, "weight": 0.10},
+        {
+            "label": "Funding dengesi",
+            "display": _display(data.get("FR")),
+            "score": _balance_score(funding, 0.0, 0.006, 0.03),
+            "weight": 0.30,
+        },
+        {
+            "label": "L/S dengesi",
+            "display": _display(data.get("LS_Ratio")),
+            "score": _balance_score(ls_ratio, 1.0, 0.10, 0.55),
+            "weight": 0.24,
+        },
+        {
+            "label": "Taker akis",
+            "display": _display(data.get("Taker")),
+            "score": _balance_score(taker, 1.0, 0.05, 0.30),
+            "weight": 0.20,
+        },
+        {
+            "label": "Open interest",
+            "display": _display(data.get("OI")),
+            "score": _linear_score(open_interest, 1_800_000, 3_800_000, inverse=True),
+            "weight": 0.16,
+        },
+        {
+            "label": "Fiyat-akis uyumu",
+            "display": f"BTC { _display(data.get('BTC_C')) } | ETF { _display(data.get('ETF_FLOW_TOTAL')) }",
+            "score": divergence_score,
+            "weight": 0.10,
+        },
     ]
     score = _weighted_metric_score(metrics)
     crowding_pressure = clamp_score(
@@ -411,12 +563,42 @@ def _build_crypto_breadth_factor(data: dict) -> dict:
         trend_support = 32
 
     metrics = [
-        {"label": "TOTAL2 katilimi", "display": f"{total2_ratio:.1f}%" if total2_ratio is not None else PLACEHOLDER, "score": _linear_score(total2_ratio, 35, 55), "weight": 0.22},
-        {"label": "TOTAL3 katilimi", "display": f"{total3_ratio:.1f}%" if total3_ratio is not None else PLACEHOLDER, "score": _linear_score(total3_ratio, 20, 42), "weight": 0.26},
-        {"label": "OTHERS payi", "display": f"{others_ratio:.1f}%" if others_ratio is not None else PLACEHOLDER, "score": _linear_score(others_ratio, 4, 16), "weight": 0.12},
-        {"label": "BTC dominance", "display": _display(data.get("Dom")), "score": _linear_score(btc_dom, 46, 60, inverse=True), "weight": 0.18},
-        {"label": "ETH participation", "display": _display(data.get("ETH_Dom")), "score": _linear_score(eth_dom, 8, 20), "weight": 0.10},
-        {"label": "Alt participation teyidi", "display": _display(data.get("BTC_C")), "score": trend_support, "weight": 0.12},
+        {
+            "label": "TOTAL2 katilimi",
+            "display": f"{total2_ratio:.1f}%" if total2_ratio is not None else PLACEHOLDER,
+            "score": _linear_score(total2_ratio, 35, 55),
+            "weight": 0.22,
+        },
+        {
+            "label": "TOTAL3 katilimi",
+            "display": f"{total3_ratio:.1f}%" if total3_ratio is not None else PLACEHOLDER,
+            "score": _linear_score(total3_ratio, 20, 42),
+            "weight": 0.26,
+        },
+        {
+            "label": "OTHERS payi",
+            "display": f"{others_ratio:.1f}%" if others_ratio is not None else PLACEHOLDER,
+            "score": _linear_score(others_ratio, 4, 16),
+            "weight": 0.12,
+        },
+        {
+            "label": "BTC dominance",
+            "display": _display(data.get("Dom")),
+            "score": _linear_score(btc_dom, 46, 60, inverse=True),
+            "weight": 0.18,
+        },
+        {
+            "label": "ETH participation",
+            "display": _display(data.get("ETH_Dom")),
+            "score": _linear_score(eth_dom, 8, 20),
+            "weight": 0.10,
+        },
+        {
+            "label": "Alt participation teyidi",
+            "display": _display(data.get("BTC_C")),
+            "score": trend_support,
+            "weight": 0.12,
+        },
     ]
     score = _weighted_metric_score(metrics)
     confidence = _confidence_score(metrics)
@@ -492,8 +674,12 @@ def _build_participation_factor(data: dict) -> dict:
         ],
         "metrics": metrics,
         "subfactors": {"macro": macro, "crypto": crypto},
-        "confidence": clamp_score(( _confidence_score(macro["metrics"]) * 0.45) + (_confidence_score(crypto["metrics"]) * 0.55)),
-        "confidence_label": _confidence_label(clamp_score(( _confidence_score(macro["metrics"]) * 0.45) + (_confidence_score(crypto["metrics"]) * 0.55))),
+        "confidence": clamp_score(
+            (_confidence_score(macro["metrics"]) * 0.45) + (_confidence_score(crypto["metrics"]) * 0.55)
+        ),
+        "confidence_label": _confidence_label(
+            clamp_score((_confidence_score(macro["metrics"]) * 0.45) + (_confidence_score(crypto["metrics"]) * 0.55))
+        ),
     }
 
 
@@ -660,13 +846,17 @@ def build_regime_scores(data: dict) -> dict:
     if crypto_breadth_factor["score"] < 50:
         invalidate_conditions.append("Crypto breadth 50 altinda kalirsa hareket BTC-odakli ve dar tabanli hale gelir.")
     if abs(macro_breadth_factor["score"] - crypto_breadth_factor["score"]) >= 20:
-        invalidate_conditions.append("Macro ve crypto katilimi daha fazla ayrisirse composite participation kirilganlasir.")
+        invalidate_conditions.append(
+            "Macro ve crypto katilimi daha fazla ayrisirse composite participation kirilganlasir."
+        )
     if factors["volatility"]["score"] < 55:
-        invalidate_conditions.append(f"VIX {data.get('VIX', PLACEHOLDER)} uzerinde yukselmeye devam ederse stres artar.")
+        invalidate_conditions.append(
+            f"VIX {data.get('VIX', PLACEHOLDER)} uzerinde yukselmeye devam ederse stres artar."
+        )
     if factors["positioning"]["score"] < 50:
         invalidate_conditions.append("Funding, L/S ve taker tek yone daha fazla yigilirsa crowding artar.")
     if factors["liquidity"]["score"] < 55:
-        invalidate_conditions.append("ETF akisi zayiflar ve DXY sert yukselirse likidite desteği kaybolur.")
+        invalidate_conditions.append("ETF akisi zayiflar ve DXY sert yukselirse likidite desteÄŸi kaybolur.")
     if not invalidate_conditions:
         invalidate_conditions.append("Belirgin invalidate kosulu yok; mevcut rejim saglikli gorunuyor.")
 
@@ -735,13 +925,15 @@ def build_scenario_matrix(data: dict) -> list[dict]:
 
 def build_alerts(data: dict, thresholds: dict) -> list[dict]:
     alerts = []
-    funding = parse_number(data.get("FR"))
-    vix = parse_number(data.get("VIX"))
+    funding  = parse_number(data.get("FR"))
+    vix      = parse_number(data.get("VIX"))
     etf_flow = parse_number(data.get("ETF_FLOW_TOTAL"))
+    dxy      = parse_number(data.get("DXY"))
 
     funding_above = thresholds.get("funding_above")
-    vix_above = thresholds.get("vix_above")
-    etf_below = thresholds.get("etf_flow_below")
+    vix_above     = thresholds.get("vix_above")
+    etf_below     = thresholds.get("etf_flow_below")
+    dxy_above     = thresholds.get("dxy_above")
 
     if funding is not None and funding_above is not None and funding > funding_above:
         alerts.append(
@@ -765,6 +957,14 @@ def build_alerts(data: dict, thresholds: dict) -> list[dict]:
                 "title": "ETF alarmi",
                 "detail": f"ETF netflow {data.get('ETF_FLOW_TOTAL', PLACEHOLDER)} | esik {etf_below:.1f}",
                 "level": "error",
+            }
+        )
+    if dxy is not None and dxy_above is not None and dxy > dxy_above:
+        alerts.append(
+            {
+                "title": "DXY alarmi",
+                "detail": f"DXY {data.get('DXY', PLACEHOLDER)} | esik {dxy_above:.2f} â€” gÃ¼Ã§lÃ¼ dolar kripto iÃ§in baskÄ±cÄ±",
+                "level": "warning",
             }
         )
 
@@ -852,7 +1052,844 @@ def markdown_to_basic_pdf_bytes(markdown_text: str) -> bytes:
 
 
 def build_analytics_payload(data: dict) -> dict:
+    scores = build_regime_scores(data)
     return {
-        "scores": build_regime_scores(data),
+        "scores":    scores,
         "scenarios": build_scenario_matrix(data),
+        "decision":  build_decision_verdict(data, scores),
+        "risk_on_off": build_risk_on_off(data),
     }
+
+
+# â”€â”€â”€ DECISION VERDICT (MQS + EWS) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+#
+# MQS â€” Market Quality Score
+#   "Piyasa ortamÄ± iÅŸlem iÃ§in elveriÅŸli mi?"
+#   Mevcut 4 faktÃ¶rden tÃ¼retilir; aÄŸÄ±rlÄ±klar biraz farklÄ± yorumlanÄ±r.
+#
+# EWS â€” Execution Window Score
+#   "Åu an iÅŸlem zamanlamasÄ± uygun mu?"
+#   KÄ±rÄ±lmalar tutunuyor mu, geri Ã§ekilmeler fÄ±rsat mÄ±?
+#   Order book + volatility + momentum odaklÄ±.
+#
+# Verdict: EVET / DÄ°KKAT / HAYIR
+#
+
+def _build_mqs(scores: dict) -> dict:
+    """
+    Market Quality Score â€” piyasa ortamÄ±nÄ±n iÅŸlem iÃ§in ne kadar elveriÅŸli olduÄŸunu Ã¶lÃ§er.
+    Mevcut faktÃ¶rlerin aÄŸÄ±rlÄ±klÄ± kompoziti; fragility cezasÄ± uygulanÄ±r.
+    
+    BileÅŸenler:
+      Liquidity    %30  â€” para akÄ±ÅŸÄ± ve dolar baskÄ±sÄ±
+      Volatility   %25  â€” VIX ve BTC volatilitesi
+      Positioning  %20  â€” crowding ve dengesiz pozisyonlar
+      Participation %25 â€” macro + crypto breadth uyumu
+    """
+    factors = {f["key"]: f for f in scores["factors"]}
+    
+    liq   = factors["liquidity"]["score"]
+    vol   = factors["volatility"]["score"]
+    pos   = factors["positioning"]["score"]
+    part  = factors["participation"]["score"]
+    frag  = scores["fragility"]["score"]
+    
+    base = (
+        liq  * 0.30 +
+        vol  * 0.25 +
+        pos  * 0.20 +
+        part * 0.25
+    )
+    
+    # Fragility cezasÄ±: fragility 35 Ã¼stÃ¼nde her puan %0.22 dÃ¼ÅŸÃ¼rÃ¼r
+    frag_penalty = max(0.0, (frag - 35) * 0.22)
+    
+    # Alignment gap cezasÄ±
+    m_bread = scores["participation"]["subfactors"]["macro"]["score"]
+    c_bread = scores["participation"]["subfactors"]["crypto"]["score"]
+    gap_penalty = max(0.0, (abs(m_bread - c_bread) - 10) * 0.25)
+    
+    mqs = clamp_score(base - frag_penalty - gap_penalty)
+    
+    # BileÅŸen daÄŸÄ±lÄ±mÄ± (gÃ¶rsel bar iÃ§in)
+    components = [
+        {"key": "liquidity",    "label": "Liquidity",    "score": liq,  "weight": 30},
+        {"key": "volatility",   "label": "Volatility",   "score": vol,  "weight": 25},
+        {"key": "positioning",  "label": "Positioning",  "score": pos,  "weight": 20},
+        {"key": "participation","label": "Participation","score": part, "weight": 25},
+    ]
+    
+    # En gÃ¼Ã§lÃ¼ ve en zayÄ±f bileÅŸen
+    strongest = max(components, key=lambda c: c["score"])
+    weakest   = min(components, key=lambda c: c["score"])
+    
+    if mqs >= 62:
+        label = "ElveriÅŸli"
+        color = "positive"
+    elif mqs >= 45:
+        label = "KarÄ±ÅŸÄ±k"
+        color = "warning"
+    else:
+        label = "ElveriÅŸsiz"
+        color = "negative"
+    
+    return {
+        "score":      mqs,
+        "label":      label,
+        "color":      color,
+        "components": components,
+        "strongest":  strongest["label"],
+        "weakest":    weakest["label"],
+        "frag_penalty":  round(frag_penalty, 1),
+        "gap_penalty":   round(gap_penalty, 1),
+    }
+
+
+def _build_ews(data: dict, scores: dict) -> dict:
+    """
+    Execution Window Score â€” ÅŸu an iÅŸlem zamanlamasÄ± uygun mu?
+    Order book, momentum ve volatility hÄ±zÄ±na bakarak kÄ±rÄ±lma/geri Ã§ekilme
+    kalitesini deÄŸerlendirir.
+    
+    BileÅŸenler:
+      Order book signal  %30  â€” destek/direnÃ§ saÄŸlamlÄ±ÄŸÄ±
+      Momentum quality   %25  â€” fiyat-akÄ±ÅŸ uyumu
+      Vol regime         %25  â€” ani ÅŸok riski
+      Positioning room   %20  â€” squeeze ve crowding alanÄ±
+    """
+    factors = {f["key"]: f for f in scores["factors"]}
+    
+    # Order book kalitesi (TR + EN + badge/class birlikte okunur)
+    ob_signal = str(data.get("ORDERBOOK_SIGNAL", "") or "")
+    ob_badge = str(data.get("ORDERBOOK_SIGNAL_BADGE", "") or "")
+    ob_class = str(data.get("ORDERBOOK_SIGNAL_CLASS", "") or "")
+    merged_signal = " ".join([ob_signal.lower(), ob_badge.lower(), ob_class.lower()])
+
+    has_long_hint = any(token in merged_signal for token in ("support", "destek", "buy", "long", "signal-long"))
+    has_short_hint = any(token in merged_signal for token in ("resistance", "direnc", "sell", "short", "signal-short"))
+    has_neutral_hint = any(token in merged_signal for token in ("mixed", "neutral", "karisik", "watch", "range"))
+
+    if has_long_hint and not has_short_hint:
+        ob_score = 76
+        ob_bias = "LONG"
+    elif has_short_hint and not has_long_hint:
+        ob_score = 76
+        ob_bias = "SHORT"
+    elif has_neutral_hint:
+        ob_score = 52
+        ob_bias = "NEUTRAL"
+    else:
+        ob_score = 55
+        ob_bias = "NEUTRAL"
+
+    # Momentum kalitesi â€” yÃ¶n deÄŸil, hareketin tutarlÄ±lÄ±ÄŸÄ± Ã¶lÃ§Ã¼lÃ¼r
+    btc_change = parse_number(data.get("BTC_C")) or 0.0
+    taker      = parse_number(data.get("Taker")) or 1.0
+    etf_flow   = parse_number(data.get("ETF_FLOW_TOTAL")) or 0.0
+
+    if abs(btc_change) < 0.35:
+        momentum_score = 52
+        momentum_bias = "NEUTRAL"
+    else:
+        direction = 1 if btc_change > 0 else -1
+        momentum_bias = "LONG" if direction > 0 else "SHORT"
+        taker_aligned = taker >= 1.02 if direction > 0 else taker <= 0.98
+        flow_aligned = etf_flow >= 0 if direction > 0 else etf_flow <= 0
+        strong_move = abs(btc_change) >= 2.5
+
+        momentum_score = 40
+        momentum_score += 24 if taker_aligned else -8
+        momentum_score += 18 if flow_aligned else -10
+        if strong_move and taker_aligned:
+            momentum_score += 8
+        if abs(btc_change) >= 4 and not taker_aligned:
+            momentum_score -= 8
+        momentum_score = clamp_score(max(18, min(88, momentum_score)))
+    
+    # Vol rejimi â€” ani ÅŸok riski
+    vol_score = factors["volatility"]["score"]
+    
+    # Positioning alanÄ± â€” crowding ne kadar?
+    pos_score = factors["positioning"]["score"]
+    
+    base = (
+        ob_score       * 0.30 +
+        momentum_score * 0.25 +
+        vol_score      * 0.25 +
+        pos_score      * 0.20
+    )
+    
+    ews = clamp_score(base)
+    
+    components = [
+        {"key": "orderbook",  "label": "Order Book",  "score": ob_score,       "weight": 30},
+        {"key": "momentum",   "label": "Momentum",    "score": momentum_score,  "weight": 25},
+        {"key": "volatility", "label": "Vol Regime",  "score": vol_score,       "weight": 25},
+        {"key": "positioning","label": "Positioning Room","score": pos_score,   "weight": 20},
+    ]
+    
+    strongest = max(components, key=lambda c: c["score"])
+    weakest   = min(components, key=lambda c: c["score"])
+    
+    if ews >= 62:
+        label = "Pencere AÃ§Ä±k"
+        color = "positive"
+    elif ews >= 45:
+        label = "Dikkatli Ol"
+        color = "warning"
+    else:
+        label = "Pencere KapalÄ±"
+        color = "negative"
+    
+    # Destek / direnÃ§ seviyeleri
+    sup = data.get("Sup_Wall", "-")
+    res = data.get("Res_Wall", "-")
+
+    if ob_bias == momentum_bias:
+        bias = ob_bias
+    elif ob_bias == "NEUTRAL":
+        bias = momentum_bias
+    elif momentum_bias == "NEUTRAL":
+        bias = ob_bias
+    else:
+        bias = "NEUTRAL"
+    
+    return {
+        "score":      ews,
+        "label":      label,
+        "color":      color,
+        "components": components,
+        "strongest":  strongest["label"],
+        "weakest":    weakest["label"],
+        "support":    sup,
+        "resistance": res,
+        "ob_signal":  ob_signal or "-",
+        "bias":       bias,
+    }
+
+
+def _build_verdict(mqs: dict, ews: dict, scores: dict) -> dict:
+    """
+    EVET / DÄ°KKAT / HAYIR kararÄ±nÄ± Ã¼retir.
+    
+    EVET:    MQS â‰¥ 60 VE EWS â‰¥ 58 VE fragility < 58 VE overall â‰¥ 55
+    DÄ°KKAT: YukarÄ±dakilerin bazÄ±larÄ± saÄŸlanÄ±yor ama hepsi deÄŸil
+    HAYIR:   MQS < 45 VEYA EWS < 40 VEYA fragility â‰¥ 70 VEYA overall < 35
+    """
+    mqs_s  = mqs["score"]
+    ews_s  = ews["score"]
+    frag_s = scores["fragility"]["score"]
+    overall = scores["overall"]
+    
+    # HAYIR koÅŸullarÄ±
+    hard_no = (
+        mqs_s < 45 or
+        ews_s < 40 or
+        frag_s >= 70 or
+        overall < 35
+    )
+    
+    # EVET koÅŸullarÄ±
+    strong_yes = (
+        mqs_s >= 60 and
+        ews_s >= 58 and
+        frag_s < 58 and
+        overall >= 55
+    )
+    
+    # DÄ°KKAT koÅŸullarÄ± â€” ikisi arasÄ±nda kalan alan
+    # hard_no deÄŸil ve strong_yes deÄŸilse otomatik DÄ°KKAT devreye girer
+    if hard_no:
+        verdict = "HAYIR"
+        verdict_en = "NO TRADE"
+        color = "negative"
+        summary = "Piyasa ortamÄ± veya iÅŸlem penceresi yeni pozisyon iÃ§in elveriÅŸli deÄŸil. Kenarda dur, teyit bekle."
+        size_guidance = "0%"
+        action = "Kenarda kal. Mevcut pozisyonlarÄ± koru, yeni aÃ§ma."
+    elif strong_yes:
+        verdict = "EVET"
+        verdict_en = "GO"
+        color = "positive"
+        summary = "Piyasa kalitesi ve iÅŸlem penceresi uyumlu. Teyitli setup'larda pozisyon alÄ±nabilir."
+        # Boyut Ã¶nerisi: overall ve MQS'e gÃ¶re
+        if overall >= 70 and mqs_s >= 70:
+            size_guidance = "Tam boyut"
+        else:
+            size_guidance = "SeÃ§ici / yarÄ± boyut"
+        action = "Teyitli setup'larda pozisyon alÄ±nabilir. Boyut: " + size_guidance
+    else:
+        verdict = "DÄ°KKAT"
+        verdict_en = "SELECTIVE"
+        color = "warning"
+        summary = "Karma sinyal. Sadece en yÃ¼ksek kaliteli setup'larda, kÃ¼Ã§Ã¼k boyutle iÅŸlem yapÄ±labilir."
+        size_guidance = "KÃ¼Ã§Ã¼k boyut / seÃ§ici"
+        action = "YalnÄ±zca en gÃ¼Ã§lÃ¼ teyitlerde, kÃ¼Ã§Ã¼k boyutle iÅŸlem. Agresif pozisyon alma."
+    
+    # Hangi koÅŸul kararÄ± belirliyor?
+    decisive_factors = []
+    if mqs_s < 45:
+        decisive_factors.append(f"MQS dÃ¼ÅŸÃ¼k ({mqs_s}/100)")
+    if ews_s < 40:
+        decisive_factors.append(f"EWS dÃ¼ÅŸÃ¼k ({ews_s}/100)")
+    if frag_s >= 70:
+        decisive_factors.append(f"Fragility yÃ¼ksek ({frag_s}/100)")
+    if mqs_s >= 60:
+        decisive_factors.append(f"MQS destekleyici ({mqs_s}/100)")
+    if ews_s >= 58:
+        decisive_factors.append(f"EWS pencere aÃ§Ä±k ({ews_s}/100)")
+    
+    return {
+        "verdict":         verdict,
+        "verdict_en":      verdict_en,
+        "color":           color,
+        "summary":         summary,
+        "action":          action,
+        "size_guidance":   size_guidance,
+        "decisive_factors": decisive_factors[:3],
+        "mqs_score":       mqs_s,
+        "ews_score":       ews_s,
+        "frag_score":      frag_s,
+        "overall":         overall,
+    }
+
+
+def build_decision_verdict(data: dict, scores: dict) -> dict:
+    """
+    Ana giriÅŸ noktasÄ±. analytics payload'a eklenir.
+    DÃ¶ner:
+      verdict  â€” EVET / DÄ°KKAT / HAYIR kararÄ±
+      mqs      â€” Market Quality Score detayÄ±
+      ews      â€” Execution Window Score detayÄ±
+    """
+    mqs     = _build_mqs(scores)
+    ews     = _build_ews(data, scores)
+    verdict = _build_verdict(mqs, ews, scores)
+    return {
+        "verdict": verdict,
+        "mqs":     mqs,
+        "ews":     ews,
+    }
+
+
+# â”€â”€â”€ RISK ON/OFF INDICATOR â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+#
+# 4 bÃ¶lgesel blok + makro stres katmanÄ±:
+#   ASIA     â€” Nikkei, HSI, CSI300  (aÄŸÄ±rlÄ±k %18)
+#   EUROPE   â€” DAX, FTSE    (aÄŸÄ±rlÄ±k %16)
+#   US       â€” SP500, NASDAQ (aÄŸÄ±rlÄ±k %18)
+#   CRYPTO   â€” BTC, ETH     (aÄŸÄ±rlÄ±k %18)
+#   MACRO STRESS â€” DXY, VIX, US10Y, OIL, GOLD (aÄŸÄ±rlÄ±k %30)
+#
+# Her bÃ¶lge iÃ§in:
+#   - BileÅŸik skor (aÄŸÄ±rlÄ±klÄ± deÄŸiÅŸim ortalamasÄ±)
+#   - Breadth (kaÃ§ tanesi pozitif)
+#   - Agreement (breadth / toplam, %)
+#   - Sinyal: RISK ON / NEUTRAL / RISK OFF
+#
+# Global skor: bÃ¶lge skorlarÄ±nÄ±n aÄŸÄ±rlÄ±klÄ± ortalamasÄ±
+# Sync Q:    bÃ¶lgeler arasÄ± uyum (agreement)
+# Agree Q:   tÃ¼m varlÄ±klar iÃ§inde pozitif olanlarÄ±n oranÄ±
+#
+
+def _pct(value) -> float | None:
+    """'%1.23' veya '1.23%' veya '1.23' â†’ float veya None"""
+    v = parse_number(value)
+    return v
+
+
+def _weighted_change_score(changes: list[float | None], weights: list[float]) -> float:
+    """AÄŸÄ±rlÄ±klÄ± deÄŸiÅŸim ortalamasÄ± â†’ normalize edilmiÅŸ 0-100 skor"""
+    total_w = 0.0
+    total_s = 0.0
+    for c, w in zip(changes, weights):
+        if c is None:
+            continue
+        # +/-5% aralÄ±ÄŸÄ±nÄ± 0-100'e normalize et
+        normalized = max(0.0, min(100.0, (c + 5.0) / 10.0 * 100.0))
+        total_s += normalized * w
+        total_w += w
+    if total_w == 0:
+        return 50.0
+    return total_s / total_w
+
+
+def _breadth(changes: list[float | None]) -> tuple[int, int]:
+    """(pozitif_sayÄ±sÄ±, toplam_geÃ§erli_sayÄ±sÄ±)"""
+    valid = [c for c in changes if c is not None]
+    pos   = sum(1 for c in valid if c > 0)
+    return pos, len(valid)
+
+
+def _region_signal(score: float, breadth_pct: float) -> str:
+    if score >= 60 and breadth_pct >= 60:
+        return "RISK ON"
+    if score <= 40 or breadth_pct <= 35:
+        return "RISK OFF"
+    return "NEUTRAL"
+
+
+def _region_color(signal: str) -> str:
+    return {"RISK ON": "positive", "NEUTRAL": "warning", "RISK OFF": "negative"}.get(signal, "warning")
+
+
+def _build_region(
+    name: str,
+    assets: list[tuple[str, str, float]],   # (label, change_key, weight)
+    data: dict,
+    region_weight: float,
+) -> dict:
+    expected = len(assets)
+    changes = [_pct(data.get(ck)) for _, ck, _ in assets]
+    weights = [w for _, _, w in assets]
+    pos, total = _breadth(changes)
+    coverage_ratio = (total / expected) if expected else 0.0
+    brd_pct    = (pos / total * 100) if total else 0.0
+    raw_score = _weighted_change_score(changes, weights)
+    score = (raw_score * coverage_ratio) + (50.0 * (1.0 - coverage_ratio))
+    if total <= 1:
+        score = (score * 0.55) + 22.5
+    breadth_for_signal = (brd_pct * coverage_ratio) + (50.0 * (1.0 - coverage_ratio))
+    signal = _region_signal(score, breadth_for_signal)
+
+    # DeÄŸiÅŸim deÄŸerlerini gÃ¶sterim iÃ§in formatla
+    asset_rows = []
+    for (lbl, ck, _), chg in zip(assets, changes):
+        asset_rows.append({
+            "label":  lbl,
+            "key":    ck,
+            "change": f"{chg:+.2f}%" if chg is not None else "-",
+            "value":  chg,
+            "pos":    chg is not None and chg > 0,
+            "risk_sign": 1,
+        })
+
+    return {
+        "name":          name,
+        "score":         round(score, 1),
+        "weight":        region_weight,
+        "signal":        signal,
+        "color":         _region_color(signal),
+        "breadth_pos":   pos,
+        "breadth_total": total,
+        "breadth_pct":   round(brd_pct, 0),
+        "breadth_adj":   round(breadth_for_signal, 0),
+        "agree_pct":     round(brd_pct, 0),
+        "assets":        asset_rows,
+        "coverage":      f"{total}/{len(assets)}",
+        "coverage_score": clamp_score(coverage_ratio * 100),
+    }
+
+
+def _build_macro_stress_block(data: dict) -> dict:
+    """
+    DXY, VIX, US10Y â†’ stres gÃ¶stergeleri (yÃ¼ksek = risk-off sinyali â†’ ters Ã§evrilir)
+    OIL, GOLD â†’ karÄ±ÅŸÄ±k sinyal (her ikisi de izlenir)
+    """
+    dxy_c   = _pct(data.get("DXY_C"))
+    vix_c   = _pct(data.get("VIX_C"))
+    us10y_c = _pct(data.get("US10Y_C"))
+    oil_c   = _pct(data.get("OIL_C"))
+    gold_c  = _pct(data.get("GOLD_C"))
+
+    # Stres bileÅŸenleri: DXYâ†‘ VIXâ†‘ US10Yâ†‘ = risk-off â†’ ters normalize
+    stress_changes  = [dxy_c, vix_c, us10y_c]
+    stress_weights  = [0.25, 0.30, 0.20]
+    stress_score_raw = _weighted_change_score(stress_changes, stress_weights)
+    # Ters Ã§evir: yÃ¼ksek stres = dÃ¼ÅŸÃ¼k risk-on skoru
+    stress_score = 100.0 - stress_score_raw
+    # Emtia tarafinda petrol yukari hareketi genellikle risk varliklari icin baski olusturur.
+    oil_score = _trend_score(oil_c, favorable_up=False, scale=4.0)   # OIL↑ = risk-on icin negatif
+    gold_score = _trend_score(gold_c, favorable_up=False, scale=3.0) # GOLD↑ = risk-on icin negatif
+    commodity_score = (oil_score * 0.60) + (gold_score * 0.40)
+
+    final_score = (stress_score * 0.70) + (commodity_score * 0.30)
+
+    assets = [
+        {"label": "DXY",   "key": "DXY_C",   "change": f"{dxy_c:+.2f}%"   if dxy_c   is not None else "-", "value": dxy_c,   "pos": dxy_c   is not None and dxy_c   < 0, "risk_sign": -1},  # DXY dÃ¼ÅŸÃ¼ÅŸÃ¼ risk-on
+        {"label": "VIX",   "key": "VIX_C",   "change": f"{vix_c:+.2f}%"   if vix_c   is not None else "-", "value": vix_c,   "pos": vix_c   is not None and vix_c   < 0, "risk_sign": -1},  # VIX dÃ¼ÅŸÃ¼ÅŸÃ¼ risk-on
+        {"label": "US10Y", "key": "US10Y_C", "change": f"{us10y_c:+.2f}%" if us10y_c is not None else "-", "value": us10y_c, "pos": us10y_c is not None and us10y_c < 0, "risk_sign": -1},  # yield dÃ¼ÅŸÃ¼ÅŸÃ¼ risk-on
+        {"label": "OIL",   "key": "OIL_C",   "change": f"{oil_c:+.2f}%"   if oil_c   is not None else "-", "value": oil_c,   "pos": oil_c   is not None and oil_c   < 0, "risk_sign": -1},  # petrol dususu risk-on
+        {"label": "GOLD",  "key": "GOLD_C",  "change": f"{gold_c:+.2f}%"  if gold_c  is not None else "-", "value": gold_c,  "pos": gold_c  is not None and gold_c  < 0, "risk_sign": -1},  # altÄ±n dÃ¼ÅŸÃ¼ÅŸÃ¼ risk-on
+    ]
+
+    signal = _region_signal(final_score, 50.0)
+    return {
+        "name":    "MACRO STRESS",
+        "score":   round(final_score, 1),
+        "weight":  0.30,
+        "signal":  signal,
+        "color":   _region_color(signal),
+        "assets":  assets,
+        "dxy":     f"{dxy_c:+.2f}%"   if dxy_c   is not None else "-",
+        "vix":     f"{vix_c:+.2f}%"   if vix_c   is not None else "-",
+        "us10y":   f"{us10y_c:+.2f}%" if us10y_c is not None else "-",
+        "oil":     f"{oil_c:+.2f}%"   if oil_c   is not None else "-",
+        "gold":    f"{gold_c:+.2f}%"  if gold_c  is not None else "-",
+        "coverage": f"{sum(1 for v in [dxy_c,vix_c,us10y_c,oil_c,gold_c] if v is not None)}/5",
+    }
+
+
+def _coverage_quality(coverage_score: int) -> str:
+    if coverage_score >= 95:
+        return "FULL"
+    if coverage_score >= 67:
+        return "PARTIAL"
+    return "THIN"
+
+
+def _confidence_tier(score: float) -> str:
+    if score >= 75:
+        return "HIGH"
+    if score >= 55:
+        return "MEDIUM"
+    return "LOW"
+
+
+def _phase_from_score(score: float) -> str:
+    if score >= 62:
+        return "BULL PHASE"
+    if score <= 38:
+        return "BEAR PHASE"
+    return "NEUTRAL PHASE"
+
+
+def _side_bias_from_state(global_score: float, transmission_score: float) -> str:
+    if global_score >= 58 and transmission_score >= 52:
+        return "LONG"
+    if global_score <= 42 and transmission_score <= 48:
+        return "SHORT"
+    return "NEUTRAL"
+
+
+def _playbook_for_side(side_bias: str) -> str:
+    if side_bias == "LONG":
+        return "long bias Â· 25% max size Â· breakout entry, no chasing"
+    if side_bias == "SHORT":
+        return "short bias Â· 25% max size Â· breakdown entry, no chasing"
+    return "neutral bias Â· 15% max size Â· selective mean-reversion only"
+
+
+def _build_cross_asset_transmission(data: dict) -> dict:
+    btc_c = _pct(data.get("BTC_C"))
+    nasdaq_c = _pct(data.get("NASDAQ_C"))
+    gold_c = _pct(data.get("GOLD_C"))
+    eth_raw = data.get("ETH_C")
+    eth_c = _pct(eth_raw) if not _is_placeholder(eth_raw) else (btc_c * 0.9 if btc_c is not None else None)
+
+    def _pair_item(pair: str, left: float | None, right: float | None, *, low: float = -3.0, high: float = 3.0):
+        if left is None or right is None:
+            return None
+        spread = left - right
+        score = _linear_score(spread, low, high)
+        if spread >= 0.60:
+            signal = "POSITIVE"
+        elif spread <= -0.60:
+            signal = "NEGATIVE"
+        else:
+            signal = "NEUTRAL"
+        return {
+            "pair": pair,
+            "spread": round(spread, 2),
+            "display": f"{spread:+.2f}",
+            "score": score,
+            "signal": signal,
+            "contribution": round((score - 50) / 10, 2),
+        }
+
+    items = [
+        _pair_item("BTC/NQ", btc_c, nasdaq_c),
+        _pair_item("ETH/BTC", eth_c, btc_c),
+        _pair_item("BTC/GOLD", btc_c, gold_c),
+    ]
+    items = [item for item in items if item]
+    score = clamp_score(sum(item["score"] for item in items) / len(items)) if items else 50
+
+    if score >= 56:
+        signal = "RISK ON"
+    elif score <= 44:
+        signal = "RISK OFF"
+    else:
+        signal = "NEUTRAL"
+
+    return {"score": score, "signal": signal, "items": items}
+
+
+def _build_risk_decomposition(
+    *,
+    strict_score: float,
+    live_score: float,
+    market_core_score: float,
+    stress_score: float,
+    transmission_score: float,
+    sync_q: float,
+    agree_q: float,
+    coverage_ratio: float,
+) -> dict:
+    def _delta(score_like: float) -> float:
+        return round((score_like - 50.0) / 10.0, 2)
+
+    strict_prelim = (sync_q * 0.50) + (agree_q * 0.50)
+    live_prelim = (sync_q * 0.45) + (agree_q * 0.35) + ((coverage_ratio * 100.0) * 0.20)
+
+    return {
+        "strict": {
+            "mkt": _delta(market_core_score),
+            "stress": _delta(stress_score),
+            "btc_tx": _delta(transmission_score),
+            "prelim_factor": _delta(strict_prelim),
+            "total": _delta(strict_score),
+        },
+        "live": {
+            "mkt": _delta(market_core_score),
+            "stress": _delta(stress_score),
+            "btc_tx": _delta(transmission_score),
+            "prelim_factor": _delta(live_prelim),
+            "total": _delta(live_score),
+        },
+    }
+
+
+def _build_ai_analysis(
+    *,
+    global_signal: str,
+    side_bias: str,
+    confidence_tier: str,
+    playbook: str,
+    drivers: list[dict],
+    drags: list[dict],
+) -> dict:
+    top_driver = drivers[0] if drivers else None
+    top_drag = drags[0] if drags else None
+    top_driver_text = f"{top_driver['label']} ({top_driver.get('impact', 0):+0.2f})" if top_driver else "N/A"
+    top_drag_text = f"{top_drag['label']} ({top_drag.get('impact', 0):+0.2f})" if top_drag else "N/A"
+
+    if global_signal == "RISK ON":
+        implication = "Risk-on confirms; keep entries selective and protect against late chase."
+    elif global_signal == "RISK OFF":
+        implication = "Risk-off pressure is dominant; defensive sizing remains preferable."
+    else:
+        implication = "Mixed tape; prioritize confirmed setups and smaller tactical size."
+
+    text = (
+        f"Top driver: {top_driver_text}. "
+        f"Top drag: {top_drag_text}. "
+        f"Implication: {implication} "
+        f"Playbook: {playbook} | Side: {side_bias} | Confidence: {confidence_tier}."
+    )
+
+    return {
+        "top_driver": top_driver_text,
+        "top_drag": top_drag_text,
+        "implication": implication,
+        "text": text,
+    }
+
+
+def build_risk_on_off(data: dict) -> dict:
+    """
+    Global Risk On/Off gÃ¶stergesi.
+    TÃ¼m bÃ¶lgelerin aÄŸÄ±rlÄ±klÄ± kompozit skoru.
+    
+    DÃ¶ner:
+      global_score   â€” 0-100 composite
+      global_signal  â€” RISK ON / NEUTRAL / RISK OFF
+      strict_score   â€” sadece yÃ¼ksek gÃ¼ven bÃ¶lgelerinden
+      live_score     â€” tÃ¼m mevcut veriden
+      sync_q         â€” bÃ¶lgeler arasÄ± uyum skoru (0-100)
+      agree_q        â€” tÃ¼m varlÄ±klar iÃ§inde pozitif % (0-100)
+      regions        â€” 4 bÃ¶lgesel blok
+      macro_stress   â€” makro stres katmanÄ±
+      drivers        â€” en gÃ¼Ã§lÃ¼ 2 sÃ¼rÃ¼cÃ¼
+      drags          â€” en gÃ¼Ã§lÃ¼ 2 frenleme
+      coverage       â€” kaÃ§/toplam varlÄ±k verisi geldi
+    """
+    # â”€â”€ BÃ¶lgeler â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    asia = _build_region("ASIA", [
+        ("N225",  "NIKKEI_C", 0.40),
+        ("HSI",   "HSI_C",    0.35),
+        ("CSI300","CSI300_C", 0.25),
+    ], data, region_weight=0.18)
+
+    europe = _build_region("EUROPE", [
+        ("DAX",  "DAX_C",  0.50),
+        ("FTSE", "FTSE_C", 0.50),
+    ], data, region_weight=0.16)
+
+    us = _build_region("US FUTURES", [
+        ("SP500",  "SP500_C",  0.50),
+        ("NASDAQ", "NASDAQ_C", 0.50),
+    ], data, region_weight=0.18)
+
+    # BTC ve ETH deÄŸiÅŸimleri
+    btc_c = _pct(data.get("BTC_C"))
+    eth_c_raw = data.get("ETH_C")
+    # ETH deÄŸiÅŸimi: eksikse BTC_C ile dÃ¼ÅŸÃ¼k katsayÄ± proxy
+    eth_c = _pct(eth_c_raw) if not _is_placeholder(eth_c_raw) else (btc_c * 0.9 if btc_c is not None else None)
+    crypto_data = data
+    if _is_placeholder(eth_c_raw) and eth_c is not None:
+        crypto_data = dict(data)
+        crypto_data["ETH_C"] = f"{eth_c:.2f}%"
+
+    crypto = _build_region("CRYPTO", [
+        ("BTC", "BTC_C",  0.55),
+        ("ETH", "ETH_C",  0.45),
+    ], crypto_data, region_weight=0.18)
+
+    macro_stress = _build_macro_stress_block(data)
+
+    # â”€â”€ Global skor â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    regions = [asia, europe, us, crypto]
+    for region in regions:
+        coverage_score = int(region.get("coverage_score", 50))
+        confidence_score = clamp_score((coverage_score * 0.60) + (region.get("agree_pct", 50) * 0.40))
+        region["weight_pct"] = int(round(region["weight"] * 100))
+        region["coverage_quality"] = _coverage_quality(coverage_score)
+        region["confidence_score"] = confidence_score
+        region["confidence_tier"] = _confidence_tier(confidence_score)
+    global_score_raw = sum(
+        r["score"] * r["weight"] for r in regions
+    ) + macro_stress["score"] * macro_stress["weight"]
+
+    total_weight = sum(r["weight"] for r in regions) + macro_stress["weight"]
+    global_score = clamp_score(global_score_raw / total_weight * (total_weight / 1.0))
+
+    # Strict score: sadece tam coverage olan bÃ¶lgeler
+    strict_regions = [r for r in regions if r["breadth_total"] >= 2]
+    if strict_regions:
+        strict_raw = sum(r["score"] * r["weight"] for r in strict_regions)
+        strict_w   = sum(r["weight"] for r in strict_regions)
+        strict_score = clamp_score((strict_raw / strict_w) * 0.7 + macro_stress["score"] * 0.3)
+    else:
+        strict_score = global_score
+
+    # â”€â”€ Sync Q: bÃ¶lgeler arasÄ± uyum â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # BÃ¶lge sinyalleri ne kadar birbirine benziyor?
+    signals = [r["signal"] for r in regions]
+    risk_on_count  = signals.count("RISK ON")
+    risk_off_count = signals.count("RISK OFF")
+    neutral_count  = signals.count("NEUTRAL")
+    dominant       = max(risk_on_count, risk_off_count, neutral_count)
+    sync_q         = clamp_score(dominant / len(signals) * 100)
+
+    # â”€â”€ Agree Q: tÃ¼m varlÄ±klarda pozitif % â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    all_assets = []
+    for r in regions:
+        all_assets.extend(r["assets"])
+    all_assets.extend(macro_stress["assets"])
+    total_assets   = len([a for a in all_assets if a["value"] is not None])
+    coverage_ratio = (total_assets / len(all_assets)) if all_assets else 0.0
+    positive_assets = len([a for a in all_assets if a["pos"] and a["value"] is not None])
+    agree_q = clamp_score((positive_assets / total_assets * 100) if total_assets else 50)
+
+    # â”€â”€ Global sinyal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    if global_score >= 60 and sync_q >= 55:
+        global_signal = "RISK ON"
+        global_color  = "positive"
+    elif global_score <= 40 or (risk_off_count >= 2 and global_score < 50):
+        global_signal = "RISK OFF"
+        global_color  = "negative"
+    else:
+        global_signal = "NEUTRAL"
+        global_color  = "warning"
+
+    # Strict signal
+    if strict_score >= 62:
+        strict_signal = "RISK ON"
+        strict_color  = "positive"
+    elif strict_score <= 38:
+        strict_signal = "RISK OFF"
+        strict_color  = "negative"
+    else:
+        strict_signal = "NEUTRAL"
+        strict_color  = "warning"
+
+    # â”€â”€ SÃ¼rÃ¼cÃ¼ler ve frenleme â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    scored_assets = []
+    for asset in all_assets:
+        value = asset.get("value")
+        if value is None:
+            continue
+        risk_sign = asset.get("risk_sign", 1)
+        risk_delta = value * risk_sign
+        scored_assets.append(
+            {
+                "label": asset["label"],
+                "change": asset["change"],
+                "risk_delta": risk_delta,
+            }
+        )
+
+    positive_contributors = sorted((a for a in scored_assets if a["risk_delta"] > 0), key=lambda a: a["risk_delta"], reverse=True)
+    negative_contributors = sorted((a for a in scored_assets if a["risk_delta"] < 0), key=lambda a: a["risk_delta"])
+    max_abs_delta = max((abs(item["risk_delta"]) for item in scored_assets), default=1.0)
+
+    def _driver_payload(item: dict) -> dict:
+        magnitude = abs(item["risk_delta"])
+        bar_pct = int(round(20 + (80 * (magnitude / max_abs_delta)))) if max_abs_delta > 0 else 20
+        return {
+            "label": item["label"],
+            "change": item["change"],
+            "impact": round(item["risk_delta"], 2),
+            "bar_pct": max(20, min(100, bar_pct)),
+        }
+
+    drivers = [_driver_payload(a) for a in positive_contributors[:2]]
+    drags = [_driver_payload(a) for a in negative_contributors[:2]]
+
+    region_weight_sum = sum(region["weight"] for region in regions) or 1.0
+    market_core_score = clamp_score(sum(region["score"] * region["weight"] for region in regions) / region_weight_sum)
+    cross_asset_transmission = _build_cross_asset_transmission(data)
+    transmission_score = cross_asset_transmission["score"]
+    phase = _phase_from_score(global_score)
+    side_bias = _side_bias_from_state(global_score, transmission_score)
+    playbook = _playbook_for_side(side_bias)
+    confidence_score = clamp_score((sync_q * 0.35) + (agree_q * 0.35) + ((coverage_ratio * 100) * 0.30))
+    confidence_tier = _confidence_tier(confidence_score)
+    decomposition = _build_risk_decomposition(
+        strict_score=strict_score,
+        live_score=global_score,
+        market_core_score=market_core_score,
+        stress_score=macro_stress["score"],
+        transmission_score=transmission_score,
+        sync_q=sync_q,
+        agree_q=agree_q,
+        coverage_ratio=coverage_ratio,
+    )
+    ai_analysis = _build_ai_analysis(
+        global_signal=global_signal,
+        side_bias=side_bias,
+        confidence_tier=confidence_tier,
+        playbook=playbook,
+        drivers=drivers,
+        drags=drags,
+    )
+
+    coverage = f"{total_assets}/{len(all_assets)}"
+
+    return {
+        "global_score":  global_score,
+        "global_signal": global_signal,
+        "global_color":  global_color,
+        "strict_score":  strict_score,
+        "strict_signal": strict_signal,
+        "strict_color":  strict_color,
+        "live_score":    global_score,
+        "sync_q":        sync_q,
+        "agree_q":       agree_q,
+        "regions":       regions,
+        "macro_stress":  macro_stress,
+        "drivers":       drivers,
+        "drags":         drags,
+        "coverage":      coverage,
+        "risk_on_count":  risk_on_count,
+        "neutral_count":  neutral_count,
+        "risk_off_count": risk_off_count,
+        "phase":         phase,
+        "side_bias":     side_bias,
+        "playbook":      playbook,
+        "confidence_tier": confidence_tier,
+        "decomposition": decomposition,
+        "cross_asset_transmission": cross_asset_transmission,
+        "ai_analysis":   ai_analysis,
+    }
+
