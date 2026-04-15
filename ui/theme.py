@@ -96,7 +96,16 @@ html, body,
 }
 
 /* ─── STREAMLIT CHROME OVERRIDES ────────────────────────────────────────── */
-#MainMenu, footer, header { visibility: hidden; }
+#MainMenu, footer { visibility: hidden; }
+
+header[data-testid="stHeader"] {
+    background: transparent !important;
+}
+
+[data-testid="collapsedControl"] {
+    visibility: visible !important;
+    display: block !important;
+}
 
 [data-testid="stSidebar"] {
     background: linear-gradient(180deg,
@@ -1281,22 +1290,6 @@ html, body,
 @media (max-width: 760px) {
     .t-state-chips { display: grid; }
     .regime-score-num { font-size: 3rem; }
-}
-
-/* ── Sidebar toggle — tüm olası Streamlit versiyonları için ─────────────── */
-[data-testid="collapsedControl"],
-button[kind="header"],
-.st-emotion-cache-1rtdyuf,
-.st-emotion-cache-pkbazv  {
-    display: flex !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    min-width: 28px !important;
-    min-height: 48px !important;
-    background: rgba(0, 170, 255, 0.15) !important;
-    border: 1px solid rgba(0, 170, 255, 0.4) !important;
-    border-radius: 0 6px 6px 0 !important;
-    z-index: 999999 !important;
 }
 </style>
 """
