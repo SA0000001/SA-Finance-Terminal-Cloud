@@ -47,6 +47,27 @@ def friendly_error(raw: str) -> str:
 
 def render_page_header(last_updated: str, health_summary: dict, brief: dict, preferences: dict, analytics: dict):
     scores = analytics["scores"]
+    roo = (analytics or {}).get("risk_on_off", {})
+    ops_html = ""
+    if roo:
+        phase = roo.get("phase", "NEUTRAL PHASE")
+        side = roo.get("side_bias", "NEUTRAL")
+        conf = roo.get("confidence_tier", "MEDIUM")
+        playbook = roo.get("playbook", "neutral bias · selective execution")
+        phase_color = "var(--positive)" if "BULL" in phase else "var(--negative)" if "BEAR" in phase else "var(--warning)"
+        side_color = "var(--positive)" if side == "LONG" else "var(--negative)" if side == "SHORT" else "var(--warning)"
+        ops_html = (
+            '<div style="margin-top:8px;padding:8px 10px;border-radius:12px;border:1px solid var(--border);'
+            'background:rgba(255,255,255,0.03)">'
+            '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px">'
+            f'<span style="padding:2px 6px;border:1px solid {phase_color};border-radius:999px;font-family:var(--font-mono);font-size:0.62rem;color:{phase_color}">{esc(phase)}</span>'
+            f'<span style="padding:2px 6px;border:1px solid {side_color};border-radius:999px;font-family:var(--font-mono);font-size:0.62rem;color:{side_color}">{esc(side)}</span>'
+            f'<span style="padding:2px 6px;border:1px solid var(--border);border-radius:999px;font-family:var(--font-mono);font-size:0.62rem;color:var(--text-muted)">CONF {esc(conf)}</span>'
+            '<span style="padding:2px 6px;border:1px solid var(--positive);border-radius:999px;font-family:var(--font-mono);font-size:0.62rem;color:var(--positive)">LIVE</span>'
+            "</div>"
+            f'<div style="font-family:var(--font-mono);font-size:0.62rem;color:var(--text-muted)">Playbook · <span style="color:var(--text-primary)">{esc(playbook)}</span></div>'
+            "</div>"
+        )
 
     chips_html = "".join(
         f'<div class="t-chip">'
@@ -83,6 +104,7 @@ def render_page_header(last_updated: str, health_summary: dict, brief: dict, pre
                     Istanbul · {esc(last_updated)}<br/>
                     Bias · {esc(scores["bias"])}
                 </div>
+                {ops_html}
             </div>
         </div>
         ''',
