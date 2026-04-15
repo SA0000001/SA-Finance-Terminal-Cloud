@@ -1,5 +1,5 @@
-"""
-SA Finance Alpha Terminal — v20
+﻿"""
+SA Finance Alpha Terminal â€” v20
 Main entry point.  Presentation only; business logic lives in domain/ and services/.
 """
 import html
@@ -54,41 +54,41 @@ AGGR_PANEL_URL      = "https://aggr.trade/brutalbtc-copy-1"
 
 st.set_page_config(
     page_title="SA Finance Alpha Terminal",
-    page_icon="⬡",
+    page_icon="â¬¡",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 st.markdown(TERMINAL_CSS, unsafe_allow_html=True)
 
-# ─── DATA SECTION CONFIGS ────────────────────────────────────────────────────
+# â”€â”€â”€ DATA SECTION CONFIGS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 MACRO_MARKET_SECTIONS = [
     {"title": "US Endeksleri",      "kicker": "Americas",      "caption": "", "rows": [("S&P 500","SP500"),("NASDAQ","NASDAQ"),("Dow Jones","DOW")]},
     {"title": "Avrupa Endeksleri",  "kicker": "Europe",        "caption": "", "rows": [("DAX","DAX"),("FTSE 100","FTSE"),("BIST 100","BIST100")]},
-    {"title": "Asya Endeksleri",    "kicker": "Asia / Vol",    "caption": "", "rows": [("Nikkei 225","NIKKEI"),("Hang Seng","HSI"),("VIX","VIX")]},
-    {"title": "Metaller",           "kicker": "Commodities",   "caption": "", "rows": [("Altın / oz","GOLD"),("Gümüş / oz","SILVER"),("Bakır","COPPER")]},
-    {"title": "Enerji & Tarım",     "kicker": "Energy & Agri", "caption": "", "rows": [("Ham Petrol WTI","OIL"),("Doğalgaz","NATGAS"),("Buğday","WHEAT")]},
+    {"title": "Asya Endeksleri",    "kicker": "Asia / Vol",    "caption": "", "rows": [("Nikkei 225","NIKKEI"),("Hang Seng","HSI"),("CSI 300","CSI300"),("VIX","VIX")]},
+    {"title": "Metaller",           "kicker": "Commodities",   "caption": "", "rows": [("AltÄ±n / oz","GOLD"),("GÃ¼mÃ¼ÅŸ / oz","SILVER"),("BakÄ±r","COPPER")]},
+    {"title": "Enerji & TarÄ±m",     "kicker": "Energy & Agri", "caption": "", "rows": [("Ham Petrol WTI","OIL"),("DoÄŸalgaz","NATGAS"),("BuÄŸday","WHEAT")]},
     {"title": "Majors FX",          "kicker": "FX Majors",     "caption": "", "rows": [("EUR/USD","EURUSD"),("GBP/USD","GBPUSD"),("USD/JPY","USDJPY")]},
     {"title": "Crosses & TRY",      "kicker": "FX Crosses",    "caption": "", "rows": [("USD/CHF","USDCHF"),("AUD/USD","AUDUSD"),("USD/TRY","USDTRY")]},
-    {"title": "Policy & Liquidity", "kicker": "Core Macro",    "caption": "", "rows": [("FED Faizi","FED"),("M2 YoY","M2"),("ABD 10Y","US10Y"),("DXY","DXY"),("BTC↔SP500","Corr_SP500"),("BTC↔Altın","Corr_Gold")]},
+    {"title": "Policy & Liquidity", "kicker": "Core Macro",    "caption": "", "rows": [("FED Faizi","FED"),("M2 YoY","M2"),("ABD 10Y","US10Y"),("DXY","DXY"),("BTCâ†”SP500","Corr_SP500"),("BTCâ†”AltÄ±n","Corr_Gold")]},
 ]
 
 FLOW_RISK_SECTIONS = [
-    {"title": "Türev & Sentiment",      "kicker": "Positioning",       "caption": "", "rows": [("Open Interest","OI"),("Funding Rate","FR"),("Taker B/S","Taker"),("L/S Oranı","LS_Ratio"),("Long %","Long_Pct"),("Short %","Short_Pct"),("L/S Sinyal","LS_Signal"),("Korku/Açgözlülük","FNG"),("FNG Dün","FNG_PREV")]},
-    {"title": "Order Book & ETF",        "kicker": "Execution Levels",  "caption": "", "rows": [("Destek Duvarı","Sup_Wall"),("Destek Hacmi","Sup_Vol"),("Direnç Duvarı","Res_Wall"),("Direnç Hacmi","Res_Vol"),("Tahta Durumu","Wall_Status"),("Birleşik Sinyal","ORDERBOOK_SIGNAL"),("Birleşik Detay","ORDERBOOK_SIGNAL_DETAIL"),("ETF Netflow","ETF_FLOW_TOTAL"),("ETF Tarih","ETF_FLOW_DATE"),("Kaynaklar","ORDERBOOK_SOURCES")]},
+    {"title": "TÃ¼rev & Sentiment",      "kicker": "Positioning",       "caption": "", "rows": [("Open Interest","OI"),("Funding Rate","FR"),("Taker B/S","Taker"),("L/S OranÄ±","LS_Ratio"),("Long %","Long_Pct"),("Short %","Short_Pct"),("L/S Sinyal","LS_Signal"),("Korku/AÃ§gÃ¶zlÃ¼lÃ¼k","FNG"),("FNG DÃ¼n","FNG_PREV")]},
+    {"title": "Order Book & ETF",        "kicker": "Execution Levels",  "caption": "", "rows": [("Destek DuvarÄ±","Sup_Wall"),("Destek Hacmi","Sup_Vol"),("DirenÃ§ DuvarÄ±","Res_Wall"),("DirenÃ§ Hacmi","Res_Vol"),("Tahta Durumu","Wall_Status"),("BirleÅŸik Sinyal","ORDERBOOK_SIGNAL"),("BirleÅŸik Detay","ORDERBOOK_SIGNAL_DETAIL"),("ETF Netflow","ETF_FLOW_TOTAL"),("ETF Tarih","ETF_FLOW_DATE"),("Kaynaklar","ORDERBOOK_SOURCES")]},
     {"title": "Stablecoin & On-Chain",   "kicker": "Liquidity Plumbing","caption": "", "rows": [("Toplam Stable","Total_Stable"),("USDT","USDT_MCap"),("USDC","USDC_MCap"),("DAI","DAI_MCap"),("Stable.C.D","STABLE_C_D"),("USDT.D","USDT_D"),("USDT Dom Stable","USDT_Dom_Stable"),("Hashrate","Hash"),("Aktif Adres","Active")]},
     {"title": "Crypto Participation",    "kicker": "Breadth Layers",    "caption": "", "rows": [("TOTAL","TOTAL_CAP"),("TOTAL2","TOTAL2_CAP"),("TOTAL3","TOTAL3_CAP"),("OTHERS","OTHERS_CAP"),("BTC Dom","Dom"),("ETH Dom","ETH_Dom")]},
     {"title": "Macro Participation",     "kicker": "ETF Breadth",       "caption": "", "rows": [("SPY","SPY_C"),("RSP","RSP_C"),("QQQ","QQQ_C"),("IWM","IWM_C"),("XLK","XLK_C"),("XLF","XLF_C"),("XLI","XLI_C"),("XLE","XLE_C"),("XLY","XLY_C")]},
 ]
 
 DATA_ATLAS_SECTIONS = [
-    {"title": "BTC & Kripto",         "rows": [("BTC Fiyatı","BTC_P"),("BTC 24s","BTC_C"),("BTC 7g","BTC_7D"),("BTC MCap","BTC_MCap"),("24s Hacim","Vol_24h"),("BTC Dom","Dom"),("ETH Dom","ETH_Dom"),("Total MCap","TOTAL_CAP"),("Total Hacim","Total_Vol")]},
-    {"title": "Türev & Sentiment",    "rows": [("OI","OI"),("Funding Rate","FR"),("Taker B/S","Taker"),("L/S Oranı","LS_Ratio"),("Long %","Long_Pct"),("Short %","Short_Pct"),("L/S Sinyal","LS_Signal"),("Fear&Greed","FNG"),("FNG Dün","FNG_PREV")]},
-    {"title": "Order Book & ETF",     "rows": [("Destek Duvarı","Sup_Wall"),("Destek Hacmi","Sup_Vol"),("Direnç Duvarı","Res_Wall"),("Direnç Hacmi","Res_Vol"),("Tahta","Wall_Status"),("Sinyal","ORDERBOOK_SIGNAL"),("Detay","ORDERBOOK_SIGNAL_DETAIL"),("Kaynaklar","ORDERBOOK_SOURCES"),("ETF Netflow","ETF_FLOW_TOTAL"),("ETF Tarih","ETF_FLOW_DATE")]},
+    {"title": "BTC & Kripto",         "rows": [("BTC FiyatÄ±","BTC_P"),("BTC 24s","BTC_C"),("BTC 7g","BTC_7D"),("BTC MCap","BTC_MCap"),("24s Hacim","Vol_24h"),("BTC Dom","Dom"),("ETH Dom","ETH_Dom"),("Total MCap","TOTAL_CAP"),("Total Hacim","Total_Vol")]},
+    {"title": "TÃ¼rev & Sentiment",    "rows": [("OI","OI"),("Funding Rate","FR"),("Taker B/S","Taker"),("L/S OranÄ±","LS_Ratio"),("Long %","Long_Pct"),("Short %","Short_Pct"),("L/S Sinyal","LS_Signal"),("Fear&Greed","FNG"),("FNG DÃ¼n","FNG_PREV")]},
+    {"title": "Order Book & ETF",     "rows": [("Destek DuvarÄ±","Sup_Wall"),("Destek Hacmi","Sup_Vol"),("DirenÃ§ DuvarÄ±","Res_Wall"),("DirenÃ§ Hacmi","Res_Vol"),("Tahta","Wall_Status"),("Sinyal","ORDERBOOK_SIGNAL"),("Detay","ORDERBOOK_SIGNAL_DETAIL"),("Kaynaklar","ORDERBOOK_SOURCES"),("ETF Netflow","ETF_FLOW_TOTAL"),("ETF Tarih","ETF_FLOW_DATE")]},
     {"title": "Crypto Participation", "rows": [("TOTAL","TOTAL_CAP"),("TOTAL2","TOTAL2_CAP"),("TOTAL3","TOTAL3_CAP"),("OTHERS","OTHERS_CAP"),("BTC Dom","Dom"),("ETH Dom","ETH_Dom")]},
     {"title": "Stablecoin & On-Chain","rows": [("Toplam Stable","Total_Stable"),("USDT","USDT_MCap"),("USDC","USDC_MCap"),("DAI","DAI_MCap"),("Stable.C.D","STABLE_C_D"),("USDT.D","USDT_D"),("USDT Dom Stable","USDT_Dom_Stable"),("Hashrate","Hash"),("Aktif Adres","Active")]},
-    {"title": "Policy & Liquidity",   "rows": [("FED Faizi","FED"),("M2 YoY","M2"),("ABD 10Y","US10Y"),("DXY","DXY"),("VIX","VIX"),("BTC↔SP500","Corr_SP500"),("BTC↔Altın","Corr_Gold")]},
-    {"title": "Endeksler & Emtia",    "rows": [("S&P 500","SP500"),("NASDAQ","NASDAQ"),("DAX","DAX"),("NIKKEI","NIKKEI"),("BIST100","BIST100"),("Altın","GOLD"),("Gümüş","SILVER"),("Petrol","OIL"),("Doğalgaz","NATGAS"),("Bakır","COPPER")]},
+    {"title": "Policy & Liquidity",   "rows": [("FED Faizi","FED"),("M2 YoY","M2"),("ABD 10Y","US10Y"),("DXY","DXY"),("VIX","VIX"),("BTCâ†”SP500","Corr_SP500"),("BTCâ†”AltÄ±n","Corr_Gold")]},
+    {"title": "Endeksler & Emtia",    "rows": [("S&P 500","SP500"),("NASDAQ","NASDAQ"),("DAX","DAX"),("NIKKEI","NIKKEI"),("CSI300","CSI300"),("BIST100","BIST100"),("AltÄ±n","GOLD"),("GÃ¼mÃ¼ÅŸ","SILVER"),("Petrol","OIL"),("DoÄŸalgaz","NATGAS"),("BakÄ±r","COPPER")]},
     {"title": "Macro ETF Breadth",    "rows": [("SPY","SPY_C"),("RSP","RSP_C"),("QQQ","QQQ_C"),("IWM","IWM_C"),("XLK","XLK_C"),("XLF","XLF_C"),("XLI","XLI_C"),("XLE","XLE_C"),("XLY","XLY_C")]},
     {"title": "Forex",                "rows": [("EUR/USD","EURUSD"),("GBP/USD","GBPUSD"),("USD/JPY","USDJPY"),("USD/TRY","USDTRY"),("USD/CHF","USDCHF"),("AUD/USD","AUDUSD")]},
 ]
@@ -105,7 +105,7 @@ CRYPTO_RADAR_ASSETS = [
     ("Chainlink", "LINK", "LINK_P", "LINK_C", "LINK_7D"),
 ]
 
-# ─── HELPERS ─────────────────────────────────────────────────────────────────
+# â”€â”€â”€ HELPERS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def data_rows(data: dict, items, *, include_change: bool = False):
     if include_change:
@@ -121,7 +121,7 @@ def render_table_row(data: dict, sections: list[dict], cols: int, *, include_cha
     columns = st.columns(cols)
     for column, section in zip(columns, sections):
         with column:
-            # label → context: section rows'daki (label, key) çiftlerinden map kur
+            # label â†’ context: section rows'daki (label, key) Ã§iftlerinden map kur
             label_ctx = {
                 label: METRIC_CONTEXT[key]
                 for label, key in section["rows"]
@@ -150,11 +150,11 @@ def relative_to_btc_tone(asset_move, btc_move) -> str:
     a = parse_percent_value(asset_move)
     b = parse_percent_value(btc_move)
     if a is None or b is None:
-        return "BTC referansı yok"
+        return "BTC referansÄ± yok"
     diff = a - b
-    if diff > 0.35:  return "BTC'den güçlü"
-    if diff < -0.35: return "BTC'den zayıf"
-    return "BTC'ye yakın"
+    if diff > 0.35:  return "BTC'den gÃ¼Ã§lÃ¼"
+    if diff < -0.35: return "BTC'den zayÄ±f"
+    return "BTC'ye yakÄ±n"
 
 
 def participation_alignment_label(macro: int, crypto: int) -> str:
@@ -179,12 +179,12 @@ def score_delta_meta(delta_7d: int) -> tuple[str, str]:
 
 
 def build_positioning_emphasis(factor: dict, brief: dict) -> tuple[str, str]:
-    crowded = {"Longlar Kalabalık", "Short Baskısı"}
+    crowded = {"Longlar KalabalÄ±k", "Short BaskÄ±sÄ±"}
     if factor["score"] <= 45 or brief["positioning"]["title"] in crowded:
-        return "Crowding riski yüksek; yeni agresyon için participation teyidi gerekli.", "risk"
+        return "Crowding riski yÃ¼ksek; yeni agresyon iÃ§in participation teyidi gerekli.", "risk"
     if factor["score"] <= 60:
-        return "Akış seçici ama kırılgan olabilir; funding ve L/S dengesini izle.", "warn"
-    return "Pozisyonlanma şu an rejimi bozacak kadar tek tarafa yığılmıyor.", "ok"
+        return "AkÄ±ÅŸ seÃ§ici ama kÄ±rÄ±lgan olabilir; funding ve L/S dengesini izle.", "warn"
+    return "Pozisyonlanma ÅŸu an rejimi bozacak kadar tek tarafa yÄ±ÄŸÄ±lmÄ±yor.", "ok"
 
 
 def build_execution_bridge(scores: dict, brief: dict) -> tuple[str, list[tuple[str, str]], str, str]:
@@ -193,24 +193,24 @@ def build_execution_bridge(scores: dict, brief: dict) -> tuple[str, list[tuple[s
     participation = scores["participation"]["score"]
     if overall >= 60 and fragility <= 55:
         return (
-            "Destekten gelen teyitli devam hareketleri, geç kalınmış breakout kovalamaktan daha temiz davranış sunar.",
+            "Destekten gelen teyitli devam hareketleri, geÃ§ kalÄ±nmÄ±ÅŸ breakout kovalamaktan daha temiz davranÄ±ÅŸ sunar.",
             [("Preferred", "Support-led continuation"), ("Aggressive If", "Participation aligned"), ("Defensive While", "VIX keeps rising")],
             brief["focus"]["badge"], "ok",
         )
     if fragility >= 65 or participation < 55:
         return (
-            "Execution daha taktik olmalı; seviyeler çalışsa bile participation teyidi olmadan agresyon pahalıya mal olabilir.",
+            "Execution daha taktik olmalÄ±; seviyeler Ã§alÄ±ÅŸsa bile participation teyidi olmadan agresyon pahalÄ±ya mal olabilir.",
             [("Preferred", "Fade extremes, respect walls"), ("Aggressive If", "Breadth & funding improve"), ("Defensive While", "Fragility elevated")],
             "WATCH", "warn",
         )
     return (
-        "Rejim yapıcı ama kusursuz değil; sadece teyitli bölgelerde ağırlık artırmak daha sağlıklı.",
+        "Rejim yapÄ±cÄ± ama kusursuz deÄŸil; sadece teyitli bÃ¶lgelerde aÄŸÄ±rlÄ±k artÄ±rmak daha saÄŸlÄ±klÄ±.",
         [("Preferred", "Selective continuation"), ("Aggressive If", "Support holds + calmer positioning"), ("Defensive While", "Participation diverges")],
         brief["focus"]["badge"], "warn",
     )
 
 
-# ─── PREFERENCES ─────────────────────────────────────────────────────────────
+# â”€â”€â”€ PREFERENCES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def init_preferences():
     if "preferences" not in st.session_state:
@@ -226,48 +226,48 @@ def init_ui_state():
         st.session_state["onboarding_done"] = False
 
 
-# ─── ONBOARDING WIZARD ───────────────────────────────────────────────────────
+# â”€â”€â”€ ONBOARDING WIZARD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 _ONBOARDING_PROFILES = {
     "Aktif Trader": {
         "default_tab": 0,  # Terminal
         "pinned_metrics": ["BTC_P", "BTC_C", "FR", "FNG", "VIX", "ETF_FLOW_TOTAL", "USDT_D", "OI"],
-        "tip": "Decision Bar'ı her gün açılışta kontrol et — EVET/DİKKAT/HAYIR skor seni yönlendirir.",
+        "tip": "Decision Bar'Ä± her gÃ¼n aÃ§Ä±lÄ±ÅŸta kontrol et â€” EVET/DÄ°KKAT/HAYIR skor seni yÃ¶nlendirir.",
     },
-    "Araştırmacı / Analist": {
-        "default_tab": 5,  # Reports (yeni numaralandırmada)
+    "AraÅŸtÄ±rmacÄ± / Analist": {
+        "default_tab": 5,  # Reports (yeni numaralandÄ±rmada)
         "pinned_metrics": ["BTC_P", "BTC_C", "BTC_7D", "TOTAL_CAP", "DXY", "VIX", "ETF_FLOW_TOTAL", "M2"],
-        "tip": "Atlas sekmesi tüm ham veriyi içeriyor. Raporlar sekmesinden PDF/Markdown export alabilirsin.",
+        "tip": "Atlas sekmesi tÃ¼m ham veriyi iÃ§eriyor. Raporlar sekmesinden PDF/Markdown export alabilirsin.",
     },
-    "İçerik Üreticisi / Newsletter": {
+    "Ä°Ã§erik Ãœreticisi / Newsletter": {
         "default_tab": 5,  # Reports
         "pinned_metrics": ["BTC_P", "BTC_C", "FNG", "ETF_FLOW_TOTAL", "FR", "TOTAL_CAP", "DXY", "VIX"],
-        "tip": "Raporlar sekmesinde AI bülten üret, ardından X thread paketini kopyalayarak paylaş.",
+        "tip": "Raporlar sekmesinde AI bÃ¼lten Ã¼ret, ardÄ±ndan X thread paketini kopyalayarak paylaÅŸ.",
     },
 }
 
 
 def render_onboarding_wizard():
     """
-    İlk açılışta gösterilir. Kullanıcı profiline göre pinned_metrics ayarlanır.
-    session_state['onboarding_done'] = True set edilince kapanır.
+    Ä°lk aÃ§Ä±lÄ±ÅŸta gÃ¶sterilir. KullanÄ±cÄ± profiline gÃ¶re pinned_metrics ayarlanÄ±r.
+    session_state['onboarding_done'] = True set edilince kapanÄ±r.
     """
     st.markdown(
         "<div style='max-width:560px;margin:60px auto 0'>"
         "<div style='font-family:var(--font-mono);font-size:0.7rem;letter-spacing:0.18em;"
         "text-transform:uppercase;color:var(--accent);margin-bottom:10px'>SA Finance Alpha Terminal</div>"
         "<div style='font-size:1.5rem;font-weight:700;color:var(--text-primary);margin-bottom:8px'>"
-        "Terminali sana göre ayarlayalım</div>"
+        "Terminali sana gÃ¶re ayarlayalÄ±m</div>"
         "<div style='font-size:0.9rem;color:var(--text-muted);margin-bottom:28px;line-height:1.6'>"
-        "Bu terminal makro, kripto ve türev verilerini tek ekranda toplar. "
-        "Nasıl kullandığına göre başlangıç görünümünü kişiselleştirelim.</div>"
+        "Bu terminal makro, kripto ve tÃ¼rev verilerini tek ekranda toplar. "
+        "NasÄ±l kullandÄ±ÄŸÄ±na gÃ¶re baÅŸlangÄ±Ã§ gÃ¶rÃ¼nÃ¼mÃ¼nÃ¼ kiÅŸiselleÅŸtirelim.</div>"
         "</div>",
         unsafe_allow_html=True,
     )
 
     col_l, col_c, col_r = st.columns([1, 2, 1])
     with col_c:
-        st.markdown("**Seni en iyi tanımlayan hangisi?**")
+        st.markdown("**Seni en iyi tanÄ±mlayan hangisi?**")
         profile_choice = st.radio(
             "Profil",
             options=list(_ONBOARDING_PROFILES.keys()),
@@ -280,11 +280,11 @@ def render_onboarding_wizard():
             f"<div style='padding:10px 14px;border-radius:6px;border:1px solid var(--border);"
             f"background:rgba(255,255,255,0.03);font-size:0.82rem;color:var(--text-muted);"
             f"margin:10px 0 18px;line-height:1.55'>"
-            f"💡 {profile['tip']}</div>",
+            f"ğŸ’¡ {profile['tip']}</div>",
             unsafe_allow_html=True,
         )
 
-        if st.button("Terminali Aç →", use_container_width=True, type="primary"):
+        if st.button("Terminali AÃ§ â†’", use_container_width=True, type="primary"):
             prefs = st.session_state["preferences"]
             prefs["pinned_metrics"] = profile["pinned_metrics"]
             prefs["_onboarding_profile"] = profile_choice
@@ -304,7 +304,7 @@ def render_onboarding_wizard():
         st.markdown("</div>", unsafe_allow_html=True)
 
 
-# ─── SIGNAL DECK ─────────────────────────────────────────────────────────────
+# â”€â”€â”€ SIGNAL DECK â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def render_signal_deck(
     kicker: str, title: str, copy: str, rows: list[tuple[str, object]],
@@ -375,7 +375,7 @@ def render_breadth_surface(title: str, factor: dict, rows, *, kicker: str, note:
     )
 
 
-# ─── REGIME / SCORE PANEL ────────────────────────────────────────────────────
+# â”€â”€â”€ REGIME / SCORE PANEL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def render_score_panel(analytics: dict):
     scores = analytics["scores"]
@@ -412,7 +412,7 @@ def render_score_panel(analytics: dict):
         delta_text, delta_cls = score_delta_meta(f["delta_7d"])
         drivers_html = "".join(f"<div class='fc-driver'>{esc(d)}</div>" for d in f["drivers"])
 
-        # "Neden bu skor?" — primary_support ve primary_risk zaten var
+        # "Neden bu skor?" â€” primary_support ve primary_risk zaten var
         primary_support = f.get("primary_support", "")
         primary_risk    = f.get("primary_risk", "")
         why_html = ""
@@ -428,7 +428,7 @@ def render_score_panel(analytics: dict):
             if primary_risk:
                 why_parts.append(
                     f"<div style='display:flex;gap:6px;align-items:baseline'>"
-                    f"<span style='font-family:var(--font-mono);font-size:0.6rem;color:var(--negative);min-width:48px'>RİSK</span>"
+                    f"<span style='font-family:var(--font-mono);font-size:0.6rem;color:var(--negative);min-width:48px'>RÄ°SK</span>"
                     f"<span style='font-size:0.74rem;color:var(--text-muted)'>{esc(primary_risk)}</span>"
                     f"</div>"
                 )
@@ -450,7 +450,7 @@ def render_score_panel(analytics: dict):
             f'</div>'
             f'<div class="fc-copy">{esc(f["summary"])}</div>'
             f'{why_html}'
-            f'<div class="fc-meta"><span>Katkı {f["contribution"]:.1f} pt</span><span>{esc(f["trend_text"])}</span></div>'
+            f'<div class="fc-meta"><span>KatkÄ± {f["contribution"]:.1f} pt</span><span>{esc(f["trend_text"])}</span></div>'
             f'<div class="fc-drivers">{drivers_html}</div>'
             f'</div>'
         )
@@ -460,7 +460,7 @@ def render_score_panel(analytics: dict):
     with left_col:
         st.markdown(
             f'<div class="regime-hero">'
-            f'<div class="s-kicker">Risk Engine · Rejim Haritası</div>'
+            f'<div class="s-kicker">Risk Engine Â· Rejim HaritasÄ±</div>'
             f'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-top:4px">'
             f'<div>'
             f'<div class="s-title" style="font-size:0.86rem;font-weight:500;color:var(--text-muted)">Overall Regime Score</div>'
@@ -468,12 +468,12 @@ def render_score_panel(analytics: dict):
             f'</div>'
             f'<div class="regime-overlay-badge">{esc(scores["overlay"])}</div>'
             f'</div>'
-            f'<div class="regime-band-copy">{esc(scores["regime_band"])}. Dominant sürücü {esc(scores["dominant_driver"])}; en zayıf halka {esc(scores["weakest_driver"])}.</div>'
+            f'<div class="regime-band-copy">{esc(scores["regime_band"])}. Dominant sÃ¼rÃ¼cÃ¼ {esc(scores["dominant_driver"])}; en zayÄ±f halka {esc(scores["weakest_driver"])}.</div>'
             f'<div class="cue-row">{cues_html}</div>'
             f'<div class="regime-stats-row">'
             f'<div class="rstat"><span class="rstat-label">Base Score</span><span class="rstat-value">{scores["base_score"]}/100</span></div>'
-            f'<div class="rstat"><span class="rstat-label">Fragility Penalty</span><span class="rstat-value">−{scores["penalty"]}</span></div>'
-            f'<div class="rstat"><span class="rstat-label">Confidence</span><span class="rstat-value">{scores["confidence"]}/100 · {esc(scores["confidence_label"])}</span></div>'
+            f'<div class="rstat"><span class="rstat-label">Fragility Penalty</span><span class="rstat-value">âˆ’{scores["penalty"]}</span></div>'
+            f'<div class="rstat"><span class="rstat-label">Confidence</span><span class="rstat-value">{scores["confidence"]}/100 Â· {esc(scores["confidence_label"])}</span></div>'
             f'</div>'
             f'<div class="contrib-list">{contrib_html}</div>'
             f'</div>',
@@ -486,7 +486,7 @@ def render_score_panel(analytics: dict):
             f'<div class="s-kicker">Fragility Overlay</div>'
             f'<div class="frag-score">{scores["fragility"]["score"]}/100</div>'
             f'<div class="frag-label">{esc(scores["fragility"]["label"])}</div>'
-            f'<div class="s-subtitle" style="margin-top:10px">Rejim skoru yüksek olsa da fragility ayrı okunur. Yüksek fragility, geniş tabanlı sağlıklı ortam garantisi değildir.</div>'
+            f'<div class="s-subtitle" style="margin-top:10px">Rejim skoru yÃ¼ksek olsa da fragility ayrÄ± okunur. YÃ¼ksek fragility, geniÅŸ tabanlÄ± saÄŸlÄ±klÄ± ortam garantisi deÄŸildir.</div>'
             f'<div class="frag-flags">{frag_flags}</div>'
             f'</div>',
             unsafe_allow_html=True,
@@ -499,7 +499,7 @@ def render_score_panel(analytics: dict):
     )
 
 
-# ─── COMMAND SURFACE ─────────────────────────────────────────────────────────
+# â”€â”€â”€ COMMAND SURFACE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def render_command_surface(data: dict, brief: dict, analytics: dict, alerts: list[dict], health_summary: dict):
     scores = analytics["scores"]
@@ -527,9 +527,9 @@ def render_command_surface(data: dict, brief: dict, analytics: dict, alerts: lis
     st.markdown(
         f'<div class="command-surface">'
         f'<div>'
-        f'<div class="s-kicker">Decision Layer · Komuta Yüzeyi</div>'
+        f'<div class="s-kicker">Decision Layer Â· Komuta YÃ¼zeyi</div>'
         f'<div class="cs-title">{esc(scores["overlay"])}</div>'
-        f'<div class="cs-copy">{esc(scores["summary"])} Bugünün tezi: {esc(brief["regime"]["title"])}, {esc(brief["liquidity"]["title"])}, {esc(brief["positioning"]["title"])} birlikte okunmalı.</div>'
+        f'<div class="cs-copy">{esc(scores["summary"])} BugÃ¼nÃ¼n tezi: {esc(brief["regime"]["title"])}, {esc(brief["liquidity"]["title"])}, {esc(brief["positioning"]["title"])} birlikte okunmalÄ±.</div>'
         f'</div>'
         f'<div class="cs-stat-grid">{stat_html}</div>'
         f'<div class="cs-cols">'
@@ -542,7 +542,7 @@ def render_command_surface(data: dict, brief: dict, analytics: dict, alerts: lis
     )
 
 
-# ─── SCENARIO MATRIX ─────────────────────────────────────────────────────────
+# â”€â”€â”€ SCENARIO MATRIX â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def render_scenario_matrix(analytics: dict):
     rows_html = "".join(
@@ -551,9 +551,9 @@ def render_scenario_matrix(analytics: dict):
     )
     st.markdown(
         f'<div class="surface surface-sm">'
-        f'<div class="s-kicker">Execution Map · Senaryo Matrisi</div>'
-        f'<div class="s-title" style="font-size:1rem">Trigger → Follow-through</div>'
-        f'<div class="s-subtitle">Sonraki hareketin hangi koşullarda teyit edildiğini gösterir.</div>'
+        f'<div class="s-kicker">Execution Map Â· Senaryo Matrisi</div>'
+        f'<div class="s-title" style="font-size:1rem">Trigger â†’ Follow-through</div>'
+        f'<div class="s-subtitle">Sonraki hareketin hangi koÅŸullarda teyit edildiÄŸini gÃ¶sterir.</div>'
         f'<table class="matrix-table"><thead><tr><th>Senaryo</th><th>Trigger</th><th>Takip Sinyali</th></tr></thead>'
         f'<tbody>{rows_html}</tbody></table>'
         f'</div>',
@@ -561,7 +561,7 @@ def render_scenario_matrix(analytics: dict):
     )
 
 
-# ─── CATALYST STREAM ─────────────────────────────────────────────────────────
+# â”€â”€â”€ CATALYST STREAM â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def get_source_health_rows(health_summary: dict, sources: list[str] | None = None, *, include_ok: bool = False):
     rows = list(health_summary.get("rows", []))
@@ -576,20 +576,20 @@ def get_source_health_rows(health_summary: dict, sources: list[str] | None = Non
 def render_catalyst_stream(data: dict, analytics: dict, alerts: list[dict], health_summary: dict):
     scores     = analytics["scores"]
     issue_rows = get_source_health_rows(health_summary, include_ok=False)[:3]
-    alert_rows = alerts[:3] or [{"title": "Aktif alarm yok", "detail": "Eşik bazlı alarm akışı şu an sessiz."}]
+    alert_rows = alerts[:3] or [{"title": "Aktif alarm yok", "detail": "EÅŸik bazlÄ± alarm akÄ±ÅŸÄ± ÅŸu an sessiz."}]
 
     alert_html = "".join(
-        f'<div class="cs-item"><strong style="color:var(--text-primary)">{esc(a["title"])}</strong> — {esc(a["detail"])}</div>'
+        f'<div class="cs-item"><strong style="color:var(--text-primary)">{esc(a["title"])}</strong> â€” {esc(a["detail"])}</div>'
         for a in alert_rows
     )
-    watch_items = list(scores.get("watch_next", [])[:2]) + [f"Veri sorunları: {len(issue_rows)}"]
+    watch_items = list(scores.get("watch_next", [])[:2]) + [f"Veri sorunlarÄ±: {len(issue_rows)}"]
     watch_html  = "".join(f"<div class='cs-item'>{esc(i)}</div>" for i in watch_items)
 
     st.markdown(
         f'<div class="catalyst-stream">'
-        f'<div class="s-kicker">Catalyst Stream · Katalizör Akışı</div>'
-        f'<div class="s-title" style="font-size:1rem">Bugün neyi izliyoruz?</div>'
-        f'<div class="s-subtitle">Tetikleyiciler ve data sağlığı özeti. Detaylı health → Status Hub.</div>'
+        f'<div class="s-kicker">Catalyst Stream Â· KatalizÃ¶r AkÄ±ÅŸÄ±</div>'
+        f'<div class="s-title" style="font-size:1rem">BugÃ¼n neyi izliyoruz?</div>'
+        f'<div class="s-subtitle">Tetikleyiciler ve data saÄŸlÄ±ÄŸÄ± Ã¶zeti. DetaylÄ± health â†’ Status Hub.</div>'
         f'<div class="cs-stream-cols">'
         f'<div class="cs-block"><div class="cs-block-title">Active Alerts</div><div class="cs-list">{alert_html}</div></div>'
         f'<div class="cs-block"><div class="cs-block-title">Next Checkpoints</div><div class="cs-list">{watch_html}</div></div>'
@@ -599,17 +599,17 @@ def render_catalyst_stream(data: dict, analytics: dict, alerts: list[dict], heal
     )
 
 
-# ─── DOWNLOADS ───────────────────────────────────────────────────────────────
+# â”€â”€â”€ DOWNLOADS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def render_downloads(data: dict, brief: dict, analytics: dict, alerts: list[dict], health_summary: dict):
     summary_md  = build_daily_summary_markdown(data, brief, analytics, alerts, health_summary)
     summary_pdf = markdown_to_basic_pdf_bytes(summary_md)
     c1, c2 = st.columns(2)
-    c1.download_button("Günlük Özet (Markdown)", summary_md, file_name="gunluk_ozet.md", mime="text/markdown", use_container_width=True)
-    c2.download_button("Günlük Özet (PDF)",      summary_pdf, file_name="gunluk_ozet.pdf", mime="application/pdf", use_container_width=True)
+    c1.download_button("GÃ¼nlÃ¼k Ã–zet (Markdown)", summary_md, file_name="gunluk_ozet.md", mime="text/markdown", use_container_width=True)
+    c2.download_button("GÃ¼nlÃ¼k Ã–zet (PDF)",      summary_pdf, file_name="gunluk_ozet.pdf", mime="application/pdf", use_container_width=True)
 
 
-# ─── REPORT PANEL ────────────────────────────────────────────────────────────
+# â”€â”€â”€ REPORT PANEL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def _format_report_body_html(body: str) -> str:
     lines = str(body or "Veri bekleniyor").splitlines()
@@ -639,7 +639,7 @@ def render_report_panel(kicker: str, title: str, body: str):
     )
 
 
-# ─── AI REPORT ───────────────────────────────────────────────────────────────
+# â”€â”€â”€ AI REPORT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def _fallback_bulten_payload(data: dict, analytics: dict, terminal_report: str = "") -> dict:
     fallback = terminal_report or _fallback_terminal_report(data, {}, analytics)
@@ -672,47 +672,47 @@ def _call_strategy_report(client, data, brief, analytics, alerts, health_summary
 
 def render_ai_report(client, data, brief, analytics, alerts, health_summary, report_depth):
     st.markdown(
-        '<div class="s-kicker">Intelligence Desk · Makro Bülten</div>',
+        '<div class="s-kicker">Intelligence Desk Â· Makro BÃ¼lten</div>',
         unsafe_allow_html=True,
     )
-    st.caption(f"Derinlik: {report_depth} · Veri, yorum ve kritik seviyelerle research-note formatında bülten üretilir.")
+    st.caption(f"Derinlik: {report_depth} Â· Veri, yorum ve kritik seviyelerle research-note formatÄ±nda bÃ¼lten Ã¼retilir.")
 
     if not client:
-        st.info("OPENROUTER_API_KEY yok — AI raporu pasif.")
+        st.info("OPENROUTER_API_KEY yok â€” AI raporu pasif.")
         return
 
-    if st.button("Makro Bülten Oluştur", use_container_width=True):
-        with st.spinner("AI raporu hazırlanıyor…"):
+    if st.button("Makro BÃ¼lten OluÅŸtur", use_container_width=True):
+        with st.spinner("AI raporu hazÄ±rlanÄ±yorâ€¦"):
             try:
                 report = _call_strategy_report(client, data, brief, analytics, alerts, health_summary, report_depth)
                 st.session_state["macro_bulten_report"] = _normalize_bulten_result(report, data, analytics)
             except TypeError:
                 st.session_state["macro_bulten_report"] = _fallback_bulten_payload(data, analytics)
-                st.warning("AI servis sözleşmesi uyumsuz; fallback bülten gösteriliyor.")
+                st.warning("AI servis sÃ¶zleÅŸmesi uyumsuz; fallback bÃ¼lten gÃ¶steriliyor.")
             except (APIConnectionError, APITimeoutError, RateLimitError, APIError, ValueError) as exc:
-                st.error(f"AI hatası: {exc}")
+                st.error(f"AI hatasÄ±: {exc}")
                 return
 
     report = st.session_state.get("macro_bulten_report")
     if not report:
-        st.info("Oluşturulduğunda Makro Bülten ve X paylaşım paketleri burada görünecek.")
+        st.info("OluÅŸturulduÄŸunda Makro BÃ¼lten ve X paylaÅŸÄ±m paketleri burada gÃ¶rÃ¼necek.")
         return
 
-    render_report_panel("Macro Bulletin", "Makro Bülten", report.get("terminal_report", ""))
+    render_report_panel("Macro Bulletin", "Makro BÃ¼lten", report.get("terminal_report", ""))
     st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
     lead_col, thread_col = st.columns([0.9, 1.1])
     with lead_col:
-        render_report_panel("X Lead", "Tek Post Özet", report.get("x_lead", ""))
+        render_report_panel("X Lead", "Tek Post Ã–zet", report.get("x_lead", ""))
     with thread_col:
         render_report_panel("X Thread", "5 Maddelik Taslak", report.get("x_thread", ""))
 
 
-# ─── TAB: TERMINAL (OVERVIEW) ─────────────────────────────────────────────────
+# â”€â”€â”€ TAB: TERMINAL (OVERVIEW) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def render_decision_bar(analytics: dict) -> None:
     """
-    Terminal sekmesinin en üstüne sabitlenen karar çubuğu.
-    EVET / DİKKAT / HAYIR  +  MQS  +  EWS  +  bileşen barları.
+    Terminal sekmesinin en Ã¼stÃ¼ne sabitlenen karar Ã§ubuÄŸu.
+    EVET / DÄ°KKAT / HAYIR  +  MQS  +  EWS  +  bileÅŸen barlarÄ±.
     """
     dec     = analytics.get("decision", {})
     verdict = dec.get("verdict", {})
@@ -723,7 +723,7 @@ def render_decision_bar(analytics: dict) -> None:
         return
 
     v_color   = verdict.get("color", "warning")
-    v_text    = verdict.get("verdict", "—")
+    v_text    = verdict.get("verdict", "â€”")
     v_en      = verdict.get("verdict_en", "")
     v_action  = verdict.get("action", "")
     v_summary = verdict.get("summary", "")
@@ -780,7 +780,7 @@ def render_decision_bar(analytics: dict) -> None:
         "background:linear-gradient(135deg,rgba(8,15,26,0.97) 0%,rgba(10,20,34,0.97) 100%);"
         "box-shadow:0 0 0 1px " + c_border + ",var(--shadow-md)'>",
 
-        # Karar bloğu
+        # Karar bloÄŸu
         "<div style='display:flex;flex-direction:column;justify-content:center;"
         "padding:12px 20px;border-radius:var(--r-md);"
         "background:" + c_bg + ";border:1px solid " + c_border + ";"
@@ -793,7 +793,7 @@ def render_decision_bar(analytics: dict) -> None:
         "opacity:0.7;margin-top:4px;letter-spacing:0.06em'>" + esc(v_en) + "</div>"
         "</div>",
 
-        # MQS bloğu
+        # MQS bloÄŸu
         "<div style='padding:12px 14px;border-radius:var(--r-md);"
         "border:1px solid var(--border);background:rgba(255,255,255,0.022)'>"
         "<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:10px'>"
@@ -806,12 +806,12 @@ def render_decision_bar(analytics: dict) -> None:
         "<div style='font-size:1.6rem;font-weight:800;letter-spacing:-0.06em;color:#fff;line-height:1'>"
         + str(mqs_s) + "</div>"
         "<div style='font-family:var(--font-mono);font-size:0.66rem;color:var(--text-muted);"
-        "letter-spacing:0.04em'>/100 · " + esc(mqs_lbl) + "</div>"
+        "letter-spacing:0.04em'>/100 Â· " + esc(mqs_lbl) + "</div>"
         "</div></div>"
         + mqs_bars +
         "</div>",
 
-        # EWS bloğu
+        # EWS bloÄŸu
         "<div style='padding:12px 14px;border-radius:var(--r-md);"
         "border:1px solid var(--border);background:rgba(255,255,255,0.022)'>"
         "<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:10px'>"
@@ -824,12 +824,12 @@ def render_decision_bar(analytics: dict) -> None:
         "<div style='font-size:1.6rem;font-weight:800;letter-spacing:-0.06em;color:#fff;line-height:1'>"
         + str(ews_s) + "</div>"
         "<div style='font-family:var(--font-mono);font-size:0.66rem;color:var(--text-muted);"
-        "letter-spacing:0.04em'>/100 · " + esc(ews_lbl) + "</div>"
+        "letter-spacing:0.04em'>/100 Â· " + esc(ews_lbl) + "</div>"
         "</div></div>"
         + ews_bars +
         "</div>",
 
-        # Aksiyon bloğu
+        # Aksiyon bloÄŸu
         "<div style='display:flex;flex-direction:column;justify-content:space-between;"
         "padding:12px 14px;border-radius:var(--r-md);"
         "border:1px solid var(--border);background:rgba(255,255,255,0.022);"
@@ -862,7 +862,7 @@ def render_overview_tab(data, brief, analytics, alerts, health_summary):
     pos_band, pos_kind = build_positioning_emphasis(factors["positioning"], brief)
     ex_copy, ex_ctx, ex_badge, ex_kind = build_execution_bridge(scores, brief)
 
-    # Hero zone: two columns — regime + command
+    # Hero zone: two columns â€” regime + command
     left, right = st.columns([1.15, 0.85])
     with left:
         render_score_panel(analytics)
@@ -903,7 +903,7 @@ def render_overview_tab(data, brief, analytics, alerts, health_summary):
             score_value=f"{f['score']}/100", score_label=f["confidence_label"],
             chips=[f["state"], f"Weight {f['weight_pct']}%", dt, f["primary_risk"]],
             context_rows=[("Macro Wt", "45%"), ("Crypto Wt", "55%"), ("Alignment", participation_alignment_label(m_bread["score"], c_bread["score"]))],
-            emphasis="Composite skor macro ve crypto katılımın birlikte teyit verip vermediğini ölçer; gap büyüyse rejim daha kırılgan okunur.",
+            emphasis="Composite skor macro ve crypto katÄ±lÄ±mÄ±n birlikte teyit verip vermediÄŸini Ã¶lÃ§er; gap bÃ¼yÃ¼yse rejim daha kÄ±rÄ±lgan okunur.",
             emphasis_kind="warn" if p_gap > 12 else "ok",
         )
     with d4:
@@ -927,17 +927,17 @@ def render_overview_tab(data, brief, analytics, alerts, health_summary):
             "Macro Breadth", m_bread,
             [("RSP vs SPY", f"{display_value(data.get('RSP_C'))} vs {display_value(data.get('SPY_C'))}"),
              ("IWM vs SPY", f"{display_value(data.get('IWM_C'))} vs {display_value(data.get('SPY_C'))}"),
-             ("Sectors", "XLK · XLF · XLI · XLE · XLY")],
+             ("Sectors", "XLK Â· XLF Â· XLI Â· XLE Â· XLY")],
             kicker="Participation Layer",
-            note="Macro breadth genel risk katılımının mega-cap dışına, small-cap ve sektör ETF'lere yayılıp yayılmadığını ölçer.",
+            note="Macro breadth genel risk katÄ±lÄ±mÄ±nÄ±n mega-cap dÄ±ÅŸÄ±na, small-cap ve sektÃ¶r ETF'lere yayÄ±lÄ±p yayÄ±lmadÄ±ÄŸÄ±nÄ± Ã¶lÃ§er.",
         )
     with b_right:
         render_breadth_surface(
             "Crypto Breadth", c_bread,
             [("TOTAL2", data.get("TOTAL2_CAP","-")), ("TOTAL3", data.get("TOTAL3_CAP","-")),
-             ("OTHERS / BTC Dom", f"{display_value(data.get('OTHERS_CAP'))} · {display_value(data.get('Dom'))}")],
+             ("OTHERS / BTC Dom", f"{display_value(data.get('OTHERS_CAP'))} Â· {display_value(data.get('Dom'))}")],
             kicker="Participation Layer",
-            note="Crypto breadth BTC dışı katılım, alt katman yayılımı ve dominance konsantrasyonunu birlikte okur.",
+            note="Crypto breadth BTC dÄ±ÅŸÄ± katÄ±lÄ±m, alt katman yayÄ±lÄ±mÄ± ve dominance konsantrasyonunu birlikte okur.",
         )
 
     st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
@@ -950,36 +950,31 @@ def render_overview_tab(data, brief, analytics, alerts, health_summary):
         render_catalyst_stream(data, analytics, alerts, health_summary)
 
 
-# ─── TAB: MACRO ──────────────────────────────────────────────────────────────
+# â”€â”€â”€ TAB: MACRO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def render_risk_on_off_panel(analytics: dict) -> None:
-    """
-    Macro sekmesinin en üstüne eklenen Global Risk On/Off göstergesi.
-    Referans: son görseldeki terminal (Global Risk On/Off Indicator).
-    """
     roo = analytics.get("risk_on_off")
     if not roo:
         return
 
     color_map = {
         "positive": ("var(--positive)", "rgba(50,217,140,0.14)", "rgba(50,217,140,0.32)"),
-        "warning":  ("var(--warning)",  "rgba(240,192,80,0.14)",  "rgba(240,192,80,0.32)"),
-        "negative": ("var(--negative)", "rgba(255,95,114,0.14)",  "rgba(255,95,114,0.32)"),
+        "warning": ("var(--warning)", "rgba(240,192,80,0.14)", "rgba(240,192,80,0.32)"),
+        "negative": ("var(--negative)", "rgba(255,95,114,0.14)", "rgba(255,95,114,0.32)"),
     }
 
-    def colors(key):
+    def colors(key: str):
         return color_map.get(key, color_map["warning"])
 
     def slider_html(score: float, color: str) -> str:
-        # RISK OFF ←――― NEUTRAL ―――→ RISK ON şeklinde slider
         pct = max(2, min(98, score))
         return (
             "<div style='position:relative;height:6px;border-radius:99px;"
             "background:linear-gradient(90deg,var(--negative) 0%,var(--warning) 50%,var(--positive) 100%);"
             "margin:10px 0 4px'>"
             "<div style='position:absolute;top:-3px;width:12px;height:12px;border-radius:50%;"
-            "background:#fff;border:2px solid " + color + ";"
-            "left:calc(" + str(pct) + "% - 6px);box-shadow:0 0 6px " + color + "'></div>"
+            "background:#fff;border:2px solid " + color + ";left:calc(" + str(pct) + "% - 6px);"
+            "box-shadow:0 0 6px " + color + "'></div>"
             "</div>"
             "<div style='display:flex;justify-content:space-between;font-family:var(--font-mono);"
             "font-size:0.6rem;color:var(--text-muted)'>"
@@ -987,21 +982,49 @@ def render_risk_on_off_panel(analytics: dict) -> None:
             "</div>"
         )
 
-    def score_block(label, score, signal, color_key, sub=None) -> str:
-        c_text, c_bg, c_border = colors(color_key)
-        sub_html = "<div style='font-family:var(--font-mono);font-size:0.66rem;color:var(--text-muted);margin-top:3px'>" + esc(sub) + "</div>" if sub else ""
+    decomposition = roo.get("decomposition", {})
+
+    def decomp_line(key: str) -> str:
+        block = decomposition.get(key, {})
+        if not block:
+            return ""
         return (
-            "<div style='padding:16px;border-radius:var(--r-md);border:1px solid " + c_border + ";"
-            "background:" + c_bg + "'>"
-            "<div style='font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.14em;"
-            "text-transform:uppercase;color:var(--text-muted);margin-bottom:4px'>" + esc(label) + "</div>"
+            f"mkt {block.get('mkt', 0):+0.1f} · stress {block.get('stress', 0):+0.1f} · "
+            f"btc-tx {block.get('btc_tx', 0):+0.1f} · prelim {block.get('prelim_factor', 0):+0.1f}"
+        )
+
+    def score_block(label, score, signal, color_key, sub=None, decomp_key: str | None = None) -> str:
+        c_text, c_bg, c_border = colors(color_key)
+        decomp = decomp_line(decomp_key) if decomp_key else ""
+        sub_html = ""
+        if sub:
+            sub_html += (
+                "<div style='font-family:var(--font-mono);font-size:0.66rem;color:var(--text-muted);margin-top:3px'>"
+                + esc(sub)
+                + "</div>"
+            )
+        if decomp:
+            sub_html += (
+                "<div style='font-family:var(--font-mono);font-size:0.62rem;color:var(--text-muted);margin-top:3px'>"
+                + esc(decomp)
+                + "</div>"
+            )
+        return (
+            "<div style='padding:16px;border-radius:var(--r-md);border:1px solid " + c_border + ";background:" + c_bg + "'>"
+            "<div style='font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.14em;text-transform:uppercase;"
+            "color:var(--text-muted);margin-bottom:4px'>" + esc(label) + "</div>"
             "<div style='font-size:2.4rem;font-weight:900;letter-spacing:-0.08em;color:" + c_text + ";line-height:1'>"
-            + str(int(score)) + "</div>"
-            + sub_html +
-            slider_html(score, c_text) +
-            "<div style='display:inline-flex;align-items:center;padding:4px 10px;border-radius:99px;"
-            "border:1px solid " + c_border + ";font-family:var(--font-mono);font-size:0.72rem;"
-            "font-weight:700;color:" + c_text + ";margin-top:8px'>" + esc(signal) + "</div>"
+            + str(int(score))
+            + "</div>"
+            + sub_html
+            + slider_html(score, c_text)
+            + "<div style='display:inline-flex;align-items:center;padding:4px 10px;border-radius:99px;border:1px solid "
+            + c_border
+            + ";font-family:var(--font-mono);font-size:0.72rem;font-weight:700;color:"
+            + c_text
+            + ";margin-top:8px'>"
+            + esc(signal)
+            + "</div>"
             "</div>"
         )
 
@@ -1011,189 +1034,234 @@ def render_risk_on_off_panel(analytics: dict) -> None:
         pos = a.get("pos", False)
         color = "var(--positive)" if pos else "var(--negative)" if val is not None else "var(--text-muted)"
         return (
-            "<div style='display:flex;justify-content:space-between;align-items:center;"
-            "padding:5px 0;border-bottom:1px solid rgba(100,140,185,0.07)'>"
-            "<span style='font-size:0.8rem;color:var(--text-muted)'>" + esc(a["label"]) + "</span>"
+            "<div style='display:flex;justify-content:space-between;align-items:center;padding:5px 0;"
+            "border-bottom:1px solid rgba(100,140,185,0.07)'>"
+            "<span style='font-size:0.8rem;color:var(--text-muted)'>" + esc(a.get("label", "-")) + "</span>"
             "<span style='font-family:var(--font-mono);font-size:0.8rem;font-weight:600;color:" + color + "'>"
-            + esc(chg) + "</span>"
+            + esc(chg)
+            + "</span>"
             "</div>"
         )
 
     def region_card(r: dict) -> str:
-        c_text, c_bg, c_border = colors(r["color"])
+        c_text, _, c_border = colors(r["color"])
         assets_html = "".join(asset_row(a) for a in r["assets"][:3])
+        meta_html = (
+            "<div style='display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px'>"
+            "<span style='padding:2px 6px;border-radius:999px;border:1px solid var(--border);font-family:var(--font-mono);"
+            "font-size:0.6rem;color:var(--text-muted)'>WGT " + str(int(r.get("weight_pct", round(r.get("weight", 0) * 100)))) + "%</span>"
+            "<span style='padding:2px 6px;border-radius:999px;border:1px solid var(--border);font-family:var(--font-mono);"
+            "font-size:0.6rem;color:var(--text-muted)'>COVQ " + esc(r.get("coverage_quality", "-")) + "</span>"
+            "<span style='padding:2px 6px;border-radius:999px;border:1px solid var(--border);font-family:var(--font-mono);"
+            "font-size:0.6rem;color:var(--text-muted)'>CONF " + esc(r.get("confidence_tier", "-")) + "</span>"
+            "</div>"
+        )
         brd_bar = (
             "<div style='margin-top:10px'>"
-            "<div style='display:flex;justify-content:space-between;font-family:var(--font-mono);"
-            "font-size:0.62rem;color:var(--text-muted);margin-bottom:4px'>"
-            "<span>BRD</span><span>" + str(r["breadth_pos"]) + "/" + str(r["breadth_total"]) + " pos</span>"
-            "</div>"
+            "<div style='display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:0.62rem;"
+            "color:var(--text-muted);margin-bottom:4px'><span>BRD</span><span>"
+            + str(r["breadth_pos"])
+            + "/"
+            + str(r["breadth_total"])
+            + " pos</span></div>"
             "<div style='height:4px;border-radius:99px;background:rgba(255,255,255,0.06)'>"
             "<div style='width:" + str(r["breadth_pct"]) + "%;height:100%;border-radius:99px;background:" + c_text + "'></div>"
             "</div>"
-            "<div style='display:flex;justify-content:space-between;font-family:var(--font-mono);"
-            "font-size:0.62rem;color:var(--text-muted);margin-top:4px'>"
-            "<span>AGR</span><span>" + str(int(r["agree_pct"])) + "%</span>"
-            "</div>"
+            "<div style='display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:0.62rem;"
+            "color:var(--text-muted);margin-top:4px'><span>AGR</span><span>" + str(int(r["agree_pct"])) + "%</span></div>"
             "</div>"
         )
         return (
-            "<div style='padding:14px;border-radius:var(--r-md);border:1px solid var(--border);"
-            "background:rgba(255,255,255,0.022)'>"
-            "<div style='display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px'>"
-            "<div>"
-            "<div style='font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.12em;"
-            "text-transform:uppercase;color:var(--text-muted)'>" + esc(r["name"]) + "</div>"
+            "<div style='padding:14px;border-radius:var(--r-md);border:1px solid var(--border);background:rgba(255,255,255,0.022)'>"
+            "<div style='display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px'><div>"
+            "<div style='font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.12em;text-transform:uppercase;"
+            "color:var(--text-muted)'>" + esc(r["name"]) + "</div>"
             "<div style='font-size:1.65rem;font-weight:900;letter-spacing:-0.06em;color:" + c_text + ";margin-top:2px;line-height:1'>"
-            + str(int(r["score"])) + "</div>"
-            "</div>"
+            + str(int(r["score"]))
+            + "</div></div>"
             "<span style='display:inline-flex;padding:4px 8px;border-radius:99px;border:1px solid " + c_border + ";"
             "font-family:var(--font-mono);font-size:0.66rem;font-weight:700;color:" + c_text + "'>"
-            + esc(r["signal"]) + "</span>"
-            "</div>"
-            "<div style='font-family:var(--font-mono);font-size:0.62rem;color:var(--text-muted);margin-bottom:6px'>"
-            "COV " + esc(r["coverage"]) + "</div>"
-            + assets_html + brd_bar +
-            "</div>"
+            + esc(r["signal"])
+            + "</span></div>"
+            + meta_html
+            + "<div style='font-family:var(--font-mono);font-size:0.62rem;color:var(--text-muted);margin-bottom:6px'>COV "
+            + esc(r["coverage"])
+            + "</div>"
+            + assets_html
+            + brd_bar
+            + "</div>"
         )
 
-    # Drivers & Drags
     def driver_row(d: dict, is_driver: bool) -> str:
         color = "var(--positive)" if is_driver else "var(--negative)"
+        width = int(d.get("bar_pct", 60))
+        impact = d.get("impact")
+        impact_text = f"{float(impact):+0.2f}" if impact is not None else "-"
         return (
             "<div style='display:flex;align-items:center;gap:8px;margin-bottom:6px'>"
+            "<span style='min-width:54px;font-family:var(--font-mono);font-size:0.72rem;color:var(--text-muted)'>"
+            + esc(d.get("label", "-"))
+            + "</span>"
             "<div style='flex:1;height:16px;border-radius:4px;background:rgba(255,255,255,0.04);overflow:hidden'>"
-            "<div style='height:100%;background:" + color + ";opacity:0.7;"
-            "width:" + ("60%" if is_driver else "60%") + "'></div>"
+            "<div style='height:100%;background:" + color + ";opacity:0.78;width:" + str(width) + "%'></div>"
             "</div>"
-            "<span style='min-width:50px;font-family:var(--font-mono);font-size:0.72rem;color:var(--text-muted)'>"
-            + esc(d["label"]) + "</span>"
-            "<span style='min-width:54px;text-align:right;font-family:var(--font-mono);font-size:0.78rem;"
-            "font-weight:700;color:" + color + "'>" + esc(d["change"]) + "</span>"
+            "<span style='min-width:56px;text-align:right;font-family:var(--font-mono);font-size:0.76rem;font-weight:700;color:"
+            + color + "'>" + esc(d.get("change", "-")) + "</span>"
+            "<span style='min-width:54px;text-align:right;font-family:var(--font-mono);font-size:0.72rem;color:"
+            + color + "'>" + esc(impact_text) + "</span>"
             "</div>"
         )
 
-    drivers_html = "".join(driver_row(d, True)  for d in roo["drivers"])
-    drags_html   = "".join(driver_row(d, False) for d in roo["drags"])
-
-    # Macro stress assets
-    stress_assets_html = "".join(asset_row(a) for a in roo["macro_stress"]["assets"])
+    drivers_html = "".join(driver_row(d, True) for d in roo.get("drivers", []))
+    drags_html = "".join(driver_row(d, False) for d in roo.get("drags", []))
     ms = roo["macro_stress"]
-    ms_c, ms_bg, ms_border = colors(ms["color"])
+    ms_c, _, ms_border = colors(ms["color"])
+    region_cards_html = "".join(region_card(r) for r in roo.get("regions", []))
 
-    # Region cards HTML
-    region_cards_html = "".join(region_card(r) for r in roo["regions"])
+    phase = roo.get("phase", "NEUTRAL PHASE")
+    side_bias = roo.get("side_bias", "NEUTRAL")
+    playbook = roo.get("playbook", "neutral bias · selective execution")
+    confidence_tier = roo.get("confidence_tier", "MEDIUM")
+    phase_color = "var(--positive)" if "BULL" in phase else "var(--negative)" if "BEAR" in phase else "var(--warning)"
+    side_color = "var(--positive)" if side_bias == "LONG" else "var(--negative)" if side_bias == "SHORT" else "var(--warning)"
+    conf_color = "var(--positive)" if confidence_tier == "HIGH" else "var(--warning)" if confidence_tier == "MEDIUM" else "var(--negative)"
 
-    # Ana layout
-    gc_text, gc_bg, gc_border = colors(roo["global_color"])
-    sc_text, sc_bg, sc_border = colors(roo["strict_color"])
+    tx = roo.get("cross_asset_transmission", {})
+    tx_items = tx.get("items", [])
+    tx_signal = tx.get("signal", "NEUTRAL")
+    tx_color = "var(--positive)" if tx_signal == "RISK ON" else "var(--negative)" if tx_signal == "RISK OFF" else "var(--warning)"
+    tx_rows = "".join(
+        "<div style='display:flex;justify-content:space-between;gap:8px;padding:4px 0;border-bottom:1px solid rgba(100,140,185,0.07)'>"
+        "<span style='font-family:var(--font-mono);font-size:0.7rem;color:var(--text-muted)'>" + esc(item.get("pair", "-")) + "</span>"
+        "<span style='font-family:var(--font-mono);font-size:0.74rem;color:"
+        + ("var(--positive)" if item.get("signal") == "POSITIVE" else "var(--negative)" if item.get("signal") == "NEGATIVE" else "var(--warning)")
+        + "'>" + esc(item.get("display", "-")) + "</span>"
+        "<span style='font-family:var(--font-mono);font-size:0.68rem;color:var(--text-muted)'>" + esc(item.get("signal", "-")) + "</span>"
+        "</div>"
+        for item in tx_items
+    )
+
+    ai_analysis = roo.get("ai_analysis", {})
+    ai_top_driver = ai_analysis.get("top_driver", "N/A")
+    ai_top_drag = ai_analysis.get("top_drag", "N/A")
+    ai_implication = ai_analysis.get("implication", "No deterministic implication.")
+    ai_text = ai_analysis.get("text", "No analysis generated.")
 
     html = (
-        # Başlık
-        "<div style='display:flex;align-items:center;justify-content:space-between;"
-        "margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border)'>"
-        "<div style='font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.2em;"
-        "text-transform:uppercase;color:var(--text-muted)'>GLOBAL RISK ON/OFF INDICATOR</div>"
-        "<div style='font-family:var(--font-mono);font-size:0.68rem;color:var(--text-muted)'>"
-        "COVERAGE " + esc(roo["coverage"]) + "</div>"
+        "<div style='display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:10px;"
+        "border-bottom:1px solid var(--border)'>"
+        "<div style='font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--text-muted)'>"
+        "GLOBAL RISK ON/OFF INDICATOR</div>"
+        "<div style='font-family:var(--font-mono);font-size:0.68rem;color:var(--text-muted)'>COVERAGE "
+        + esc(roo["coverage"])
+        + "</div></div>"
+
+        "<div style='display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;"
+        "margin-bottom:12px;padding:10px 12px;border-radius:var(--r-md);border:1px solid var(--border);background:rgba(255,255,255,0.02)'>"
+        "<div style='display:flex;gap:8px;flex-wrap:wrap'>"
+        "<span style='padding:4px 8px;border-radius:999px;border:1px solid " + phase_color + ";font-family:var(--font-mono);font-size:0.66rem;color:" + phase_color + "'>"
+        + esc(phase) + "</span>"
+        "<span style='padding:4px 8px;border-radius:999px;border:1px solid " + side_color + ";font-family:var(--font-mono);font-size:0.66rem;color:" + side_color + "'>"
+        + esc(side_bias) + "</span>"
+        "<span style='padding:4px 8px;border-radius:999px;border:1px solid " + conf_color + ";font-family:var(--font-mono);font-size:0.66rem;color:" + conf_color + "'>"
+        + "CONF " + esc(confidence_tier) + "</span>"
+        "<span style='padding:4px 8px;border-radius:999px;border:1px solid var(--positive);font-family:var(--font-mono);font-size:0.66rem;color:var(--positive)'>LIVE</span>"
+        "</div>"
+        "<div style='font-family:var(--font-mono);font-size:0.66rem;color:var(--text-muted)'>ACTIVE PLAYBOOK "
+        "<span style='color:var(--text-primary)'>" + esc(playbook) + "</span></div>"
         "</div>"
 
-        # Üst satır: Strict Sync | Drivers/Drags | Live Now
         "<div style='display:grid;grid-template-columns:220px 1fr 220px;gap:14px;margin-bottom:14px'>"
-
-        # STRICT SYNC
-        + score_block("STRICT SYNC", roo["strict_score"], roo["strict_signal"], roo["strict_color"],
-                       sub=f"sync q · {roo['sync_q']}   agree q · {roo['agree_q']}") +
-
-        # DRIVERS + DRAGS
-        "<div style='padding:14px;border-radius:var(--r-md);border:1px solid var(--border);"
-        "background:rgba(255,255,255,0.022)'>"
+        + score_block(
+            "STRICT SYNC",
+            roo["strict_score"],
+            roo["strict_signal"],
+            roo["strict_color"],
+            sub=f"sync q · {roo['sync_q']}   agree q · {roo['agree_q']}",
+            decomp_key="strict",
+        )
+        + "<div style='padding:14px;border-radius:var(--r-md);border:1px solid var(--border);background:rgba(255,255,255,0.022)'>"
         "<div style='display:grid;grid-template-columns:1fr 1fr;gap:12px'>"
-        "<div>"
-        "<div style='font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.12em;"
-        "text-transform:uppercase;color:var(--positive);margin-bottom:8px'>▲ DRIVERS · LIVE NOW</div>"
-        + (drivers_html if drivers_html else "<div style='font-size:0.78rem;color:var(--text-muted)'>Veri bekleniyor</div>") +
+        "<div><div style='font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--positive);margin-bottom:8px'>▲ DRIVERS · LIVE NOW</div>"
+        + (drivers_html if drivers_html else "<div style='font-size:0.78rem;color:var(--text-muted)'>Veri bekleniyor</div>")
+        + "</div>"
+        "<div><div style='font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--negative);margin-bottom:8px'>▼ DRAGS</div>"
+        + (drags_html if drags_html else "<div style='font-size:0.78rem;color:var(--text-muted)'>Veri bekleniyor</div>")
+        + "</div></div>"
+        "<div style='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px'>"
+        "<div style='padding:8px;border-radius:var(--r-sm);border:1px solid var(--border);background:rgba(255,255,255,0.018)'>"
+        "<div style='font-family:var(--font-mono);font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px'>"
+        "CROSS-ASSET TRANSMISSION " + "<span style='color:" + tx_color + "'>" + esc(tx_signal) + "</span></div>"
+        + (tx_rows if tx_rows else "<div style='font-size:0.74rem;color:var(--text-muted)'>Cross-asset veri eksik</div>")
+        + "</div>"
+        "<div style='padding:8px;border-radius:var(--r-sm);border:1px solid var(--border);background:rgba(255,255,255,0.018)'>"
+        "<div style='font-family:var(--font-mono);font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px'>"
+        "AI ANALYSIS</div>"
+        "<div style='font-size:0.72rem;color:var(--text-muted);margin-bottom:2px'>top driver <span style='color:var(--text-primary)'>"
+        + esc(ai_top_driver) + "</span></div>"
+        "<div style='font-size:0.72rem;color:var(--text-muted);margin-bottom:2px'>top drag <span style='color:var(--text-primary)'>"
+        + esc(ai_top_drag) + "</span></div>"
+        "<div style='font-size:0.72rem;color:var(--text-muted);margin-bottom:4px'>implication <span style='color:var(--text-primary)'>"
+        + esc(ai_implication) + "</span></div>"
+        "<div style='font-size:0.68rem;color:var(--text-muted)'>" + esc(ai_text) + "</div>"
         "</div>"
-        "<div>"
-        "<div style='font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.12em;"
-        "text-transform:uppercase;color:var(--negative);margin-bottom:8px'>▼ DRAGS</div>"
-        + (drags_html if drags_html else "<div style='font-size:0.78rem;color:var(--text-muted)'>Veri bekleniyor</div>") +
         "</div>"
         "</div>"
-        "</div>"
+        + score_block(
+            "LIVE NOW",
+            roo["live_score"],
+            roo["global_signal"],
+            roo["global_color"],
+            sub=f"risk on {roo['risk_on_count']} · neutral {roo['neutral_count']} · off {roo['risk_off_count']}",
+            decomp_key="live",
+        )
+        + "</div>"
 
-        # LIVE NOW
-        + score_block("LIVE NOW", roo["live_score"], roo["global_signal"], roo["global_color"],
-                       sub=f"risk on {roo['risk_on_count']} · neutral {roo['neutral_count']} · off {roo['risk_off_count']}") +
-
-        "</div>"  # üst grid bitti
-
-        # Bölge kartları
         "<div style='display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:14px'>"
-        + region_cards_html +
-        "</div>"
+        + region_cards_html
+        + "</div>"
 
-        # Macro Stress Block
-        "<div style='padding:14px;border-radius:var(--r-md);border:1px solid " + ms_border + ";"
-        "background:rgba(255,255,255,0.018)'>"
+        "<div style='padding:14px;border-radius:var(--r-md);border:1px solid " + ms_border + ";background:rgba(255,255,255,0.018)'>"
         "<div style='display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:start'>"
-        "<div>"
-        "<div style='font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.12em;"
-        "text-transform:uppercase;color:var(--text-muted);margin-bottom:6px'>MACRO STRESS BLOCK</div>"
-        "<div style='font-size:1.5rem;font-weight:900;letter-spacing:-0.06em;color:" + ms_c + ";line-height:1'>"
-        + str(int(ms["score"])) + "</div>"
-        "<div style='display:inline-flex;padding:4px 8px;border-radius:99px;margin-top:6px;"
-        "border:1px solid " + ms_border + ";font-family:var(--font-mono);font-size:0.66rem;"
-        "font-weight:700;color:" + ms_c + "'>" + esc(ms["signal"]) + "</div>"
-        "</div>"
+        "<div><div style='font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px'>MACRO STRESS BLOCK</div>"
+        "<div style='font-size:1.5rem;font-weight:900;letter-spacing:-0.06em;color:" + ms_c + ";line-height:1'>" + str(int(ms["score"])) + "</div>"
+        "<div style='display:inline-flex;padding:4px 8px;border-radius:99px;margin-top:6px;border:1px solid " + ms_border + ";font-family:var(--font-mono);font-size:0.66rem;font-weight:700;color:" + ms_c + "'>"
+        + esc(ms["signal"])
+        + "</div></div>"
         "<div style='display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px'>"
     )
 
-    # Macro stress individual tiles
     for a in ms["assets"]:
         val = a.get("value")
         pos = a.get("pos", False)
         color = "var(--positive)" if pos else "var(--negative)" if val is not None else "var(--text-muted)"
-        # DXY/VIX/US10Y için açıklama notu
-        note = ""
-        if a["label"] == "DXY":   note = "1D"
-        elif a["label"] == "VIX":   note = "1D"
-        elif a["label"] == "US10Y": note = "1D"
-        elif a["label"] == "OIL":   note = "1D"
-        elif a["label"] == "GOLD":  note = "1D"
         html += (
-            "<div style='padding:10px;border-radius:var(--r-sm);border:1px solid var(--border);"
-            "background:rgba(255,255,255,0.025)'>"
-            "<div style='font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.1em;"
-            "text-transform:uppercase;color:var(--text-muted)'>" + esc(a["label"]) + "</div>"
+            "<div style='padding:10px;border-radius:var(--r-sm);border:1px solid var(--border);background:rgba(255,255,255,0.025)'>"
+            "<div style='font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-muted)'>"
+            + esc(a["label"])
+            + "</div>"
             "<div style='font-size:1.3rem;font-weight:800;letter-spacing:-0.05em;color:" + color + ";margin-top:4px;line-height:1'>"
-            + esc(a["change"]) + "</div>"
-            "<div style='font-family:var(--font-mono);font-size:0.6rem;color:var(--text-muted);margin-top:3px'>"
-            + note + "</div>"
+            + esc(a["change"])
+            + "</div>"
+            "<div style='font-family:var(--font-mono);font-size:0.6rem;color:var(--text-muted);margin-top:3px'>1D</div>"
             "</div>"
         )
 
-    html += (
-        "</div>"   # grid 5 cols
-        "</div>"   # inner grid 2 cols
-        "</div>"   # macro stress block
-    )
+    html += "</div></div></div>"
 
     st.markdown(
-        "<div style='padding:18px 20px;margin:0 0 16px 0;border-radius:var(--r-lg);"
-        "border:1px solid var(--border);background:linear-gradient(135deg,"
-        "rgba(8,15,26,0.97) 0%,rgba(10,20,34,0.97) 100%)'>"
-        + html +
-        "</div>",
+        "<div style='padding:18px 20px;margin:0 0 16px 0;border-radius:var(--r-lg);border:1px solid var(--border);"
+        "background:linear-gradient(135deg,rgba(8,15,26,0.97) 0%,rgba(10,20,34,0.97) 100%)'>"
+        + html
+        + "</div>",
         unsafe_allow_html=True,
     )
-
 
 def render_macro_tab(data: dict, analytics: dict):
     st.markdown(
         '<div class="s-kicker">Macro Intelligence</div>'
         '<div class="s-title">Makro & Piyasalar</div>'
-        '<div class="s-subtitle">Makro risk context ve cross-asset okuyuşu. Terminal özetini tekrar etmez; hammaddeyi taşır.</div>',
+        '<div class="s-subtitle">Makro risk context ve cross-asset okuyuÅŸu. Terminal Ã¶zetini tekrar etmez; hammaddeyi taÅŸÄ±r.</div>',
         unsafe_allow_html=True,
     )
     st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
@@ -1213,18 +1281,18 @@ def render_macro_tab(data: dict, analytics: dict):
     render_table_row(data, [section_variant(MACRO_MARKET_SECTIONS[5]), section_variant(MACRO_MARKET_SECTIONS[6])], 2, include_change=True)
 
 
-# ─── TAB: SIGNALS (Flow + Crypto birleşik) ───────────────────────────────────
+# â”€â”€â”€ TAB: SIGNALS (Flow + Crypto birleÅŸik) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def render_signals_tab(data: dict, health_summary: dict):
     st.markdown(
         '<div class="s-kicker">Signals Intelligence</div>'
         '<div class="s-title">Sinyaller</div>'
-        '<div class="s-subtitle">Türev & akış verileri ile kripto radar tek sekmede.</div>',
+        '<div class="s-subtitle">TÃ¼rev & akÄ±ÅŸ verileri ile kripto radar tek sekmede.</div>',
         unsafe_allow_html=True,
     )
     st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
 
-    inner_tabs = st.tabs(["Türev & Akış", "Kripto Radar"])
+    inner_tabs = st.tabs(["TÃ¼rev & AkÄ±ÅŸ", "Kripto Radar"])
 
     with inner_tabs[0]:
         scores   = build_analytics_payload(data)["scores"]
@@ -1257,17 +1325,17 @@ def render_signals_tab(data: dict, health_summary: dict):
         ]
         btc_week = data.get("BTC_7D", "-")
         weekly_cards = [
-            (f"{symbol} · 24h {display_value(data.get(ck, '-'))}", data.get(wk, "-"), relative_to_btc_tone(data.get(wk), btc_week))
+            (f"{symbol} Â· 24h {display_value(data.get(ck, '-'))}", data.get(wk, "-"), relative_to_btc_tone(data.get(wk), btc_week))
             for _, symbol, _, ck, wk in CRYPTO_RADAR_ASSETS
         ]
-        cat("Price Snapshot", "●")
+        cat("Price Snapshot", "â—")
         render_cards(price_cards, cols=4, compact=True)
         st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
-        cat("Relative Performance vs BTC", "◨")
+        cat("Relative Performance vs BTC", "â—¨")
         render_compact_metric_strip(weekly_cards, cols=3)
 
 
-# ─── TAB: REPORTS ────────────────────────────────────────────────────────────
+# â”€â”€â”€ TAB: REPORTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def _render_cached_report_panel(cached: dict) -> None:
     """Diskten okunan bir raporu ekrana basar."""
@@ -1277,13 +1345,13 @@ def _render_cached_report_panel(cached: dict) -> None:
     ts      = cached.get("timestamp", "")
     slot    = cached.get("time_label", "-")
 
-    # Üst bilgi şeridi
+    # Ãœst bilgi ÅŸeridi
     st.markdown(
         f'<div class="section-notice">'
-        f'Slot <strong>{esc(slot)}</strong> · '
-        f'Uretilme: <strong>{esc(ts[:16].replace("T", " "))}</strong> · '
+        f'Slot <strong>{esc(slot)}</strong> Â· '
+        f'Uretilme: <strong>{esc(ts[:16].replace("T", " "))}</strong> Â· '
         f'Rejim: <strong>{esc(regime.get("overlay", "-"))}</strong> '
-        f'({esc(regime.get("score", "-"))}/100) · '
+        f'({esc(regime.get("score", "-"))}/100) Â· '
         f'BTC: <strong>{esc(market.get("btc_price", "-"))}</strong> '
         f'{esc(market.get("btc_change", ""))}'
         f'</div>',
@@ -1317,12 +1385,12 @@ def render_report_tab(client, data, brief, analytics, alerts, health_summary, re
     st.markdown(
         '<div class="s-kicker">Intelligence Desk</div>'
         '<div class="s-title">Raporlar & Kataliz\u00f6rler</div>'
-        '<div class="s-subtitle">Sabah ve aksam bulten slotlari. Arşiv altta.</div>',
+        '<div class="s-subtitle">Sabah ve aksam bulten slotlari. ArÅŸiv altta.</div>',
         unsafe_allow_html=True,
     )
     st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
 
-    # ── Slot toggle ──────────────────────────────────────────────────────────
+    # â”€â”€ Slot toggle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     slot_col, right_col = st.columns([0.5, 0.5])
     with slot_col:
         slot_choice = st.radio(
@@ -1334,7 +1402,7 @@ def render_report_tab(client, data, brief, analytics, alerts, health_summary, re
         )
     slot_key = "1630" if slot_choice == "16:30 Bulteni" else "2245"
 
-    # ── Market Tools + News — üstte, hemen erişilebilir ─────────────────────
+    # â”€â”€ Market Tools + News â€” Ã¼stte, hemen eriÅŸilebilir â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     tools_col, news_col = st.columns([1.1, 0.9])
     with tools_col:
         with st.expander("Market Tools", expanded=False):
@@ -1362,13 +1430,13 @@ def render_report_tab(client, data, brief, analytics, alerts, health_summary, re
                 st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
                 st.markdown(
                     '<div class="section-notice">'
-                    'Google Trends, iframe içine yüklenmeye izin vermiyor (güvenlik politikası). '
-                    'Aşağıdaki butonu kullanarak doğrudan Google Trends sayfasını aç.'
+                    'Google Trends, iframe iÃ§ine yÃ¼klenmeye izin vermiyor (gÃ¼venlik politikasÄ±). '
+                    'AÅŸaÄŸÄ±daki butonu kullanarak doÄŸrudan Google Trends sayfasÄ±nÄ± aÃ§.'
                     '</div>',
                     unsafe_allow_html=True,
                 )
                 st.link_button(
-                    "Google Trends'te Aç — Bitcoin · Altın · Petrol · ABD Doları · Hisse",
+                    "Google Trends'te AÃ§ â€” Bitcoin Â· AltÄ±n Â· Petrol Â· ABD DolarÄ± Â· Hisse",
                     "https://trends.google.com/trends/explore?q=%2Fm%2F05p0rrx,%2Fm%2F025rs2z,%2Fm%2F05r_j,%2Fm%2F09nqf,%2Fm%2F077mq&hl=tr&date=today+12-m,today+12-m,today+12-m,today+12-m,today+12-m",
                     use_container_width=True,
                 )
@@ -1380,7 +1448,7 @@ def render_report_tab(client, data, brief, analytics, alerts, health_summary, re
                     st.markdown(
                         f'<div class="news-card">'
                         f'<a href="{html.escape(str(item["url"]))}" target="_blank">{html.escape(str(item["title"]))}</a>'
-                        f'<div class="news-meta">{html.escape(str(item["time"]))} · {html.escape(str(item["source"]))}</div>'
+                        f'<div class="news-meta">{html.escape(str(item["time"]))} Â· {html.escape(str(item["source"]))}</div>'
                         f'</div>',
                         unsafe_allow_html=True,
                     )
@@ -1389,7 +1457,7 @@ def render_report_tab(client, data, brief, analytics, alerts, health_summary, re
 
     st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
 
-    # ── Cached rapor yoksa AI raporu, varsa diskten oku ─────────────────────
+    # â”€â”€ Cached rapor yoksa AI raporu, varsa diskten oku â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     cached = load_latest_report(slot_key)
 
     main_left, main_right = st.columns([1.35, 0.65])
@@ -1415,11 +1483,11 @@ def render_report_tab(client, data, brief, analytics, alerts, health_summary, re
         st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
         render_scenario_matrix(analytics)
 
-    # ── Export ───────────────────────────────────────────────────────────────
+    # â”€â”€ Export â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
     render_downloads(data, brief, analytics, alerts, health_summary)
 
-    # ── Gecmis Raporlar ──────────────────────────────────────────────────────
+    # â”€â”€ Gecmis Raporlar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
     st.markdown(
         '<div class="s-kicker">Arsiv</div>'
@@ -1447,13 +1515,13 @@ def render_report_tab(client, data, brief, analytics, alerts, health_summary, re
         _render_cached_report_panel(selected)
 
 
-# ─── TAB: ATLAS ──────────────────────────────────────────────────────────────
+# â”€â”€â”€ TAB: ATLAS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def render_all_metrics_tab(data: dict):
     st.markdown(
         '<div class="s-kicker">Deep Reference Layer</div>'
-        '<div class="s-title">Atlas · Tüm Metrikler</div>'
-        '<div class="s-subtitle">Ham veri referansı. Gruplu ve arama odaklı çalışır — her şey aynı anda açılmaz.</div>',
+        '<div class="s-title">Atlas Â· TÃ¼m Metrikler</div>'
+        '<div class="s-subtitle">Ham veri referansÄ±. Gruplu ve arama odaklÄ± Ã§alÄ±ÅŸÄ±r â€” her ÅŸey aynÄ± anda aÃ§Ä±lmaz.</div>',
         unsafe_allow_html=True,
     )
     st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
@@ -1466,7 +1534,7 @@ def render_all_metrics_tab(data: dict):
         render_table_row(data, [DATA_ATLAS_SECTIONS[5], DATA_ATLAS_SECTIONS[6], DATA_ATLAS_SECTIONS[8]], 3)
 
 
-# ─── MAIN ─────────────────────────────────────────────────────────────────────
+# â”€â”€â”€ MAIN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 init_preferences()
 init_ui_state()
@@ -1474,7 +1542,7 @@ preferences = st.session_state["preferences"]
 client      = build_openrouter_client(OPENROUTER_API_KEY) if OPENROUTER_API_KEY else None
 last_updated = pd.Timestamp.now(tz="Europe/Istanbul").strftime("%d.%m.%Y %H:%M:%S")
 
-with st.spinner("Piyasa verileri yükleniyor…"):
+with st.spinner("Piyasa verileri yÃ¼kleniyorâ€¦"):
     data = load_terminal_data(FRED_API_KEY)
     current_health = merge_source_health(st.session_state.get("source_health"), data.pop("_health", {}))
     data["_health"] = current_health
@@ -1487,21 +1555,22 @@ alerts         = build_alerts(data, preferences.get("thresholds", {}))
 
 render_page_header(last_updated, health_summary, brief, preferences, analytics)
 
-# ─── Onboarding gate — header dışında her şeyi gizle ────────────────────────
+# â”€â”€â”€ Onboarding gate â€” header dÄ±ÅŸÄ±nda her ÅŸeyi gizle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 if not st.session_state.get("onboarding_done", False):
     render_onboarding_wizard()
     st.stop()
 
-# ─── Sidebar — tüm operasyon, status, ayarlar burada ────────────────────────
+# â”€â”€â”€ Sidebar â€” tÃ¼m operasyon, status, ayarlar burada â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 render_sidebar(data, brief, last_updated, health_summary, preferences, alerts, analytics=analytics)
 
-# ─── Decision Bar — tüm sekmeler üstünde global ──────────────────────────────
+# â”€â”€â”€ Decision Bar â€” tÃ¼m sekmeler Ã¼stÃ¼nde global â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 render_decision_bar(analytics)
 
-# ─── 5 sekme ─────────────────────────────────────────────────────────────────
+# â”€â”€â”€ 5 sekme â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 tabs = st.tabs(["Terminal", "Macro", "Sinyaller", "Raporlar", "Atlas"])
 with tabs[0]: render_overview_tab(data, brief, analytics, alerts, health_summary)
 with tabs[1]: render_macro_tab(data, analytics)
 with tabs[2]: render_signals_tab(data, health_summary)
 with tabs[3]: render_report_tab(client, data, brief, analytics, alerts, health_summary, preferences.get("report_depth", "Orta"))
 with tabs[4]: render_all_metrics_tab(data)
+
