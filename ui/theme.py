@@ -1298,47 +1298,5 @@ button[kind="header"],
     border-radius: 0 6px 6px 0 !important;
     z-index: 999999 !important;
 }
-
-/* ─── FLOATING SIDEBAR TOGGLE ───────────────────────────────────────────── */
-#sa-sidebar-toggle {
-    position: fixed;
-    top: 50%;
-    left: 0;
-    transform: translateY(-50%);
-    z-index: 9999999;
-    width: 22px;
-    height: 64px;
-    background: rgba(8, 20, 36, 0.92);
-    border: 1px solid rgba(82, 200, 255, 0.28);
-    border-left: none;
-    border-radius: 0 8px 8px 0;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: width 0.18s ease, background 0.18s ease, border-color 0.18s ease;
-    backdrop-filter: blur(8px);
-    box-shadow: 2px 0 16px rgba(0,0,0,0.5), inset -1px 0 0 rgba(82,200,255,0.08);
-}
-#sa-sidebar-toggle:hover {
-    width: 30px;
-    background: rgba(82, 200, 255, 0.12);
-    border-color: rgba(82, 200, 255, 0.55);
-    box-shadow: 2px 0 20px rgba(82,200,255,0.15), inset -1px 0 0 rgba(82,200,255,0.15);
-}
-#sa-sidebar-toggle svg {
-    transition: transform 0.22s ease, opacity 0.18s ease;
-    opacity: 0.55;
-}
-#sa-sidebar-toggle:hover svg {
-    opacity: 1;
-    transform: scale(1.15);
-}
-#sa-sidebar-toggle.sidebar-open svg {
-    transform: rotate(180deg);
-}
-#sa-sidebar-toggle:hover.sidebar-open svg {
-    transform: rotate(180deg) scale(1.15);
-}
 </style>
 """
