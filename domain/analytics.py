@@ -118,19 +118,19 @@ def _top_drivers(metrics: list[dict], count: int = 3) -> list[str]:
 
 def _factor_state(score: int) -> str:
     if score >= 75:
-        return "Guvetli destek"
+        return "Güçlü destek"
     if score >= 60:
-        return "Yapici"
+        return "Yapıcı"
     if score >= 45:
-        return "Karisik"
+        return "Karışık"
     if score >= 30:
-        return "Kirigan"
+        return "Kırıgan"
     return "Stresli"
 
 
 def _factor_trend_text(delta_7d: int) -> str:
     if delta_7d >= 4:
-        return "Iyilesiyor"
+        return "İyileşiyor"
     if delta_7d <= -4:
         return "Bozuluyor"
     return "Dengeleniyor"
@@ -824,7 +824,7 @@ def build_regime_scores(data: dict) -> dict:
     elif overall >= 60 and fragility["score"] <= 60:
         bias = "Risk-on korunabilir ama pozisyon boyutlari secici tutulmali."
     elif overall >= 60:
-        bias = "Yapici rejim var ancak crowding ve vol nedeniyle taktik kalmak gerekiyor."
+        bias = "Yapıcı rejim var ancak crowding ve vol nedeniyle taktik kalmak gerekiyor."
     elif overall >= 45:
         bias = "Kararsiz rejim; teyit gelmeden agresif pozisyon almak icin erken."
     elif factors["liquidity"]["delta_7d"] > 2:
@@ -1481,11 +1481,11 @@ def _build_macro_stress_block(data: dict) -> dict:
     final_score = stress_score * 0.75 + commodity_score * 0.25
 
     assets = [
-        {"label": "DXY",   "key": "DXY_C",   "change": f"{dxy_c:+.2f}%"   if dxy_c   is not None else "-", "value": dxy_c,   "pos": dxy_c   is not None and dxy_c   < 0},  # DXY düşüşü risk-on
-        {"label": "VIX",   "key": "VIX_C",   "change": f"{vix_c:+.2f}%"   if vix_c   is not None else "-", "value": vix_c,   "pos": vix_c   is not None and vix_c   < 0},  # VIX düşüşü risk-on
-        {"label": "US10Y", "key": "US10Y_C", "change": f"{us10y_c:+.2f}%" if us10y_c is not None else "-", "value": us10y_c, "pos": us10y_c is not None and us10y_c < 0},  # yield düşüşü risk-on
-        {"label": "OIL",   "key": "OIL_C",   "change": f"{oil_c:+.2f}%"   if oil_c   is not None else "-", "value": oil_c,   "pos": oil_c   is not None and oil_c   > 0},
-        {"label": "GOLD",  "key": "GOLD_C",  "change": f"{gold_c:+.2f}%"  if gold_c  is not None else "-", "value": gold_c,  "pos": gold_c  is not None and gold_c  < 0},  # altın düşüşü risk-on
+        {"label": "DXY",   "key": "DXY_C",   "change": f"{dxy_c:+.2f}%"   if dxy_c   is not None else "-", "value": dxy_c,   "pos": dxy_c   is not None and dxy_c   < 0,  "risk_sign": -1},  # DXY düşüşü risk-on
+        {"label": "VIX",   "key": "VIX_C",   "change": f"{vix_c:+.2f}%"   if vix_c   is not None else "-", "value": vix_c,   "pos": vix_c   is not None and vix_c   < 0,  "risk_sign": -1},  # VIX düşüşü risk-on
+        {"label": "US10Y", "key": "US10Y_C", "change": f"{us10y_c:+.2f}%" if us10y_c is not None else "-", "value": us10y_c, "pos": us10y_c is not None and us10y_c < 0, "risk_sign": -1},  # yield düşüşü risk-on
+        {"label": "OIL",   "key": "OIL_C",   "change": f"{oil_c:+.2f}%"   if oil_c   is not None else "-", "value": oil_c,   "pos": oil_c   is not None and oil_c   < 0,  "risk_sign": -1},  # petrol düşüşü risk-on
+        {"label": "GOLD",  "key": "GOLD_C",  "change": f"{gold_c:+.2f}%"  if gold_c  is not None else "-", "value": gold_c,  "pos": gold_c  is not None and gold_c  < 0,  "risk_sign": -1},  # altın düşüşü risk-on
     ]
 
     signal = _region_signal(final_score, 50.0)
@@ -1527,7 +1527,7 @@ def build_risk_on_off(data: dict) -> dict:
     asia = _build_region("ASIA", [
         ("N225",  "NIKKEI_C", 0.40),
         ("HSI",   "HSI_C",    0.35),
-        ("SHCOMP","SP500_C",  0.25),  # SHCOMP yok, proxy olarak SP500_C kullan ama düşük ağırlık
+        ("SHCOMP","CSI300_C", 0.25),
     ], data, region_weight=0.18)
 
     europe = _build_region("EUROPE", [
@@ -1612,13 +1612,61 @@ def build_risk_on_off(data: dict) -> dict:
         strict_color  = "warning"
 
     # ── Sürücüler ve frenleme ─────────────────────────────────────────────────
-    scored_assets = sorted(
-        [a for a in all_assets if a["value"] is not None],
-        key=lambda a: a["value"] if a["value"] else 0,
-        reverse=True,
-    )
-    drivers = [{"label": a["label"], "change": a["change"]} for a in scored_assets[:3] if a["value"] and a["value"] > 0]
-    drags   = [{"label": a["label"], "change": a["change"]} for a in reversed(scored_assets) if a["value"] and a["value"] < 0][:3]
+    # Önce raw asset hareketlerini risk_sign ile değerlendir
+    scored_assets_raw = []
+    for a in all_assets:
+        if a["value"] is None:
+            continue
+        risk_sign = a.get("risk_sign", 1)
+        risk_delta = a["value"] * risk_sign
+        scored_assets_raw.append({"label": a["label"], "change": a["change"], "risk_delta": risk_delta})
+
+    # Cross-asset ratio sinyallerini ekle: ETH/BTC, BTC/NQ, BTC/GOLD
+    btc_c_d  = _pct(data.get("BTC_C"))
+    eth_c_d  = _pct(data.get("ETH_C"))
+    if eth_c_d is None and btc_c_d is not None:
+        eth_c_d = btc_c_d * 0.9
+    nq_c_d   = _pct(data.get("NASDAQ_C"))
+    gold_c_d = _pct(data.get("GOLD_C"))
+    _scale = 3.0
+    for lbl, left, right in [("ETH/BTC", eth_c_d, btc_c_d), ("BTC/NQ", btc_c_d, nq_c_d), ("BTC/GOLD", btc_c_d, gold_c_d)]:
+        if left is not None and right is not None:
+            sp = left - right
+            scored_assets_raw.append({"label": lbl, "change": f"{sp:+.2f}pp", "risk_delta": sp / _scale})
+
+    max_abs = max((abs(a["risk_delta"]) for a in scored_assets_raw), default=1.0)
+    def _dpay(a: dict) -> dict:
+        mag = abs(a["risk_delta"])
+        return {
+            "label": a["label"],
+            "change": a["change"],
+            "impact": round(a["risk_delta"], 2),
+            "bar_pct": max(20, min(100, int(round(20 + 80 * mag / max_abs)) if max_abs > 0 else 20)),
+        }
+    drivers = [_dpay(a) for a in sorted((x for x in scored_assets_raw if x["risk_delta"] > 0), key=lambda x: x["risk_delta"], reverse=True)[:3]]
+    drags   = [_dpay(a) for a in sorted((x for x in scored_assets_raw if x["risk_delta"] < 0), key=lambda x: x["risk_delta"])[:3]]
+
+    # ── Cross-asset transmission ────────────────────────────────────────────
+    def _pair_item_d(pair, left, right, low=-3.0, high=3.0):
+        if left is None or right is None:
+            return None
+        spread = left - right
+        score = max(0, min(100, int((spread - low) / (high - low) * 100)))
+        signal = "POSITIVE" if spread >= 0.60 else "NEGATIVE" if spread <= -0.60 else "NEUTRAL"
+        return {"pair": pair, "spread": round(spread,2), "display": f"{spread:+.2f}", "score": score, "signal": signal, "contribution": round((score-50)/10,2)}
+    btc_cx = _pct(data.get("BTC_C"))
+    eth_raw_cx = data.get("ETH_C")
+    eth_cx = _pct(eth_raw_cx) if eth_raw_cx and eth_raw_cx != "-" else (btc_cx * 0.9 if btc_cx else None)
+    nq_cx  = _pct(data.get("NASDAQ_C"))
+    gold_cx = _pct(data.get("GOLD_C"))
+    tx_items = [x for x in [
+        _pair_item_d("ETH/BTC", eth_cx, btc_cx),
+        _pair_item_d("BTC/NQ",  btc_cx, nq_cx),
+        _pair_item_d("BTC/GOLD", btc_cx, gold_cx),
+    ] if x is not None]
+    tx_score = max(0, min(100, int(sum(i["score"] for i in tx_items) / len(tx_items)))) if tx_items else 50
+    tx_signal = "RISK ON" if tx_score >= 56 else "RISK OFF" if tx_score <= 44 else "NEUTRAL"
+    cross_asset_transmission = {"score": tx_score, "signal": tx_signal, "items": tx_items}
 
     coverage = f"{total_assets}/{len(all_assets)}"
 
@@ -1634,10 +1682,11 @@ def build_risk_on_off(data: dict) -> dict:
         "agree_q":       agree_q,
         "regions":       regions,
         "macro_stress":  macro_stress,
-        "drivers":       drivers[:2],
-        "drags":         drags[:2],
+        "drivers":       drivers,
+        "drags":         drags,
         "coverage":      coverage,
         "risk_on_count":  risk_on_count,
         "neutral_count":  neutral_count,
         "risk_off_count": risk_off_count,
+        "cross_asset_transmission": cross_asset_transmission,
     }
