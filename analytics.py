@@ -124,19 +124,19 @@ def _top_drivers(metrics: list[dict], count: int = 3) -> list[str]:
 
 def _factor_state(score: int) -> str:
     if score >= 75:
-        return "Guvetli destek"
+        return "Güçlü destek"
     if score >= 60:
-        return "Yapici"
+        return "Yapıcı"
     if score >= 45:
-        return "Karisik"
+        return "Karışık"
     if score >= 30:
-        return "Kirigan"
+        return "Kırıgan"
     return "Stresli"
 
 
 def _factor_trend_text(delta_7d: int) -> str:
     if delta_7d >= 4:
-        return "Iyilesiyor"
+        return "İyileşiyor"
     if delta_7d <= -4:
         return "Bozuluyor"
     return "Dengeleniyor"
@@ -830,7 +830,7 @@ def build_regime_scores(data: dict) -> dict:
     elif overall >= 60 and fragility["score"] <= 60:
         bias = "Risk-on korunabilir ama pozisyon boyutlari secici tutulmali."
     elif overall >= 60:
-        bias = "Yapici rejim var ancak crowding ve vol nedeniyle taktik kalmak gerekiyor."
+        bias = "Yapıcı rejim var ancak crowding ve vol nedeniyle taktik kalmak gerekiyor."
     elif overall >= 45:
         bias = "Kararsiz rejim; teyit gelmeden agresif pozisyon almak icin erken."
     elif factors["liquidity"]["delta_7d"] > 2:
@@ -1819,6 +1819,34 @@ def build_risk_on_off(data: dict) -> dict:
             }
         )
 
+    # ── Cross-asset ratio sinyallerini de drivers/drags'a ekle ─────────────────
+    # ETH/BTC, BTC/NQ, BTC/GOLD — fiyat değişiminden değil spread'den türetilir
+    btc_c_raw  = _pct(data.get("BTC_C"))
+    eth_c_raw2 = data.get("ETH_C")
+    eth_c2     = _pct(eth_c_raw2) if not _is_placeholder(eth_c_raw2) else (btc_c_raw * 0.9 if btc_c_raw is not None else None)
+    nasdaq_c2  = _pct(data.get("NASDAQ_C"))
+    gold_c2    = _pct(data.get("GOLD_C"))
+
+    def _ratio_scored_asset(label: str, left: float | None, right: float | None, scale: float = 3.0) -> dict | None:
+        if left is None or right is None:
+            return None
+        spread = left - right
+        # Spread > 0 → sol varlık daha güçlü → risk-on katkısı
+        return {
+            "label": label,
+            "change": f"{spread:+.2f}pp",
+            "risk_delta": spread / scale,  # normalize, büyük fiyat hareketleriyle ölçekli
+        }
+
+    ratio_candidates = [
+        _ratio_scored_asset("ETH/BTC",  eth_c2,     btc_c_raw),
+        _ratio_scored_asset("BTC/NQ",   btc_c_raw,  nasdaq_c2),
+        _ratio_scored_asset("BTC/GOLD", btc_c_raw,  gold_c2),
+    ]
+    for rc in ratio_candidates:
+        if rc is not None:
+            scored_assets.append(rc)
+
     positive_contributors = sorted((a for a in scored_assets if a["risk_delta"] > 0), key=lambda a: a["risk_delta"], reverse=True)
     negative_contributors = sorted((a for a in scored_assets if a["risk_delta"] < 0), key=lambda a: a["risk_delta"])
     max_abs_delta = max((abs(item["risk_delta"]) for item in scored_assets), default=1.0)
@@ -1833,8 +1861,8 @@ def build_risk_on_off(data: dict) -> dict:
             "bar_pct": max(20, min(100, bar_pct)),
         }
 
-    drivers = [_driver_payload(a) for a in positive_contributors[:2]]
-    drags = [_driver_payload(a) for a in negative_contributors[:2]]
+    drivers = [_driver_payload(a) for a in positive_contributors[:3]]
+    drags = [_driver_payload(a) for a in negative_contributors[:3]]
 
     region_weight_sum = sum(region["weight"] for region in regions) or 1.0
     market_core_score = clamp_score(sum(region["score"] * region["weight"] for region in regions) / region_weight_sum)

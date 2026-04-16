@@ -1141,11 +1141,45 @@ def render_risk_on_off_panel(analytics: dict) -> None:
         for item in tx_items
     )
 
-    ai_analysis = roo.get("ai_analysis", {})
-    ai_top_driver = ai_analysis.get("top_driver", "N/A")
-    ai_top_drag = ai_analysis.get("top_drag", "N/A")
-    ai_implication = ai_analysis.get("implication", "No deterministic implication.")
-    ai_text = ai_analysis.get("text", "No analysis generated.")
+    # Expanded cross-asset transmission cards (ETH/BTC, BTC/NQ, BTC/GOLD)
+    def _tx_card(item: dict) -> str:
+        sig = item.get("signal", "NEUTRAL")
+        c = "var(--positive)" if sig == "POSITIVE" else "var(--negative)" if sig == "NEGATIVE" else "var(--warning)"
+        bg = "rgba(50,217,140,0.07)" if sig == "POSITIVE" else "rgba(255,95,114,0.07)" if sig == "NEGATIVE" else "rgba(240,192,80,0.07)"
+        border = "rgba(50,217,140,0.25)" if sig == "POSITIVE" else "rgba(255,95,114,0.25)" if sig == "NEGATIVE" else "rgba(240,192,80,0.25)"
+        pair = item.get("pair", "-")
+        display = item.get("display", "-")
+        spread = item.get("spread", 0)
+        bar_pct = max(5, min(100, int(50 + abs(spread) * 8)))
+        bar_color = c
+        # Context note per pair
+        context = {
+            "ETH/BTC": "ETH güçlüyse → kripto risk iştahı yüksek",
+            "BTC/NQ": "BTC güçlüyse → risk liderliği var",
+            "BTC/GOLD": "BTC güçlüyse → güvenli liman akışı zayıf",
+        }.get(pair, "")
+        return (
+            "<div style='padding:10px 12px;border-radius:var(--r-sm);border:1px solid " + border + ";background:" + bg + ";flex:1;min-width:0'>"
+            "<div style='display:flex;align-items:center;justify-content:space-between;margin-bottom:6px'>"
+            "<span style='font-family:var(--font-mono);font-size:0.72rem;font-weight:700;color:" + c + "'>" + esc(pair) + "</span>"
+            "<span style='padding:2px 8px;border-radius:99px;border:1px solid " + border + ";font-family:var(--font-mono);font-size:0.62rem;color:" + c + "'>" + esc(sig) + "</span>"
+            "</div>"
+            "<div style='font-size:1.5rem;font-weight:900;letter-spacing:-0.06em;color:" + c + ";line-height:1;margin-bottom:6px'>" + esc(display) + "</div>"
+            "<div style='height:4px;border-radius:99px;background:rgba(255,255,255,0.06);margin-bottom:6px'>"
+            "<div style='width:" + str(bar_pct) + "%;height:100%;border-radius:99px;background:" + bar_color + ";opacity:0.7'></div>"
+            "</div>"
+            "<div style='font-family:var(--font-mono);font-size:0.6rem;color:var(--text-muted)'>" + esc(context) + "</div>"
+            "</div>"
+        )
+
+    if tx_items:
+        tx_rows_expanded = (
+            "<div style='display:flex;gap:10px;flex-wrap:wrap'>"
+            + "".join(_tx_card(item) for item in tx_items)
+            + "</div>"
+        )
+    else:
+        tx_rows_expanded = "<div style='font-size:0.74rem;color:var(--text-muted)'>Cross-asset veri eksik</div>"
 
     html = (
         "<div style='display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:10px;"
@@ -1188,24 +1222,13 @@ def render_risk_on_off_panel(analytics: dict) -> None:
         "<div><div style='font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--negative);margin-bottom:8px'>▼ DRAGS</div>"
         + (drags_html if drags_html else "<div style='font-size:0.78rem;color:var(--text-muted)'>Veri bekleniyor</div>")
         + "</div></div>"
-        "<div style='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px'>"
-        "<div style='padding:8px;border-radius:var(--r-sm);border:1px solid var(--border);background:rgba(255,255,255,0.018)'>"
-        "<div style='font-family:var(--font-mono);font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px'>"
-        "CROSS-ASSET TRANSMISSION " + "<span style='color:" + tx_color + "'>" + esc(tx_signal) + "</span></div>"
-        + (tx_rows if tx_rows else "<div style='font-size:0.74rem;color:var(--text-muted)'>Cross-asset veri eksik</div>")
+        + "<div style='margin-top:10px;padding:10px 12px;border-radius:var(--r-sm);border:1px solid " + tx_color.replace('var(--', 'rgba(').replace(')', ',0.25)') + ";background:rgba(255,255,255,0.018)'>"
+        "<div style='display:flex;align-items:center;justify-content:space-between;margin-bottom:10px'>"
+        "<div style='font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--text-muted)'>CROSS-ASSET TRANSMISSION</div>"
+        "<span style='padding:3px 10px;border-radius:99px;border:1px solid " + tx_color + ";font-family:var(--font-mono);font-size:0.66rem;font-weight:700;color:" + tx_color + "'>" + esc(tx_signal) + "</span>"
+        "</div>"
+        + tx_rows_expanded
         + "</div>"
-        "<div style='padding:8px;border-radius:var(--r-sm);border:1px solid var(--border);background:rgba(255,255,255,0.018)'>"
-        "<div style='font-family:var(--font-mono);font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px'>"
-        "AI ANALYSIS</div>"
-        "<div style='font-size:0.72rem;color:var(--text-muted);margin-bottom:2px'>top driver <span style='color:var(--text-primary)'>"
-        + esc(ai_top_driver) + "</span></div>"
-        "<div style='font-size:0.72rem;color:var(--text-muted);margin-bottom:2px'>top drag <span style='color:var(--text-primary)'>"
-        + esc(ai_top_drag) + "</span></div>"
-        "<div style='font-size:0.72rem;color:var(--text-muted);margin-bottom:4px'>implication <span style='color:var(--text-primary)'>"
-        + esc(ai_implication) + "</span></div>"
-        "<div style='font-size:0.68rem;color:var(--text-muted)'>" + esc(ai_text) + "</div>"
-        "</div>"
-        "</div>"
         "</div>"
         + score_block(
             "LIVE NOW",
