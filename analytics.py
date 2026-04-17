@@ -128,17 +128,17 @@ def _factor_state(score: int) -> str:
     if score >= 75:
         return "Güçlü destek"
     if score >= 60:
-        return "Yap?c?"
+        return "Yapıcı"
     if score >= 45:
-        return "Kar???k"
+        return "Karışık"
     if score >= 30:
-        return "K?r?gan"
+        return "Kırılgan"
     return "Stresli"
 
 
 def _factor_trend_text(delta_7d: int) -> str:
     if delta_7d >= 4:
-        return "?yile?iyor"
+        return "iyileşiyor"
     if delta_7d <= -4:
         return "Bozuluyor"
     return "Dengeleniyor"
