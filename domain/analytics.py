@@ -1315,7 +1315,7 @@ def _build_verdict(mqs: dict, ews: dict, scores: dict) -> dict:
     if mqs_s >= 60:
         decisive_factors.append(f"MQS destekleyici ({mqs_s}/100)")
     if ews_s >= 58:
-        decisive_factors.append(f"EWS pencere a?k ({ews_s}/100)")
+        decisive_factors.append(f"EWS pencere açık ({ews_s}/100)")
     
     return {
         "verdict":         verdict,
@@ -1352,7 +1352,7 @@ def build_decision_verdict(data: dict, scores: dict) -> dict:
 
 # ??? RISK ON/OFF INDICATOR ????????????????????????????????????????????????????
 #
-# 4 bölgesel blok + makro stres katman?:
+# 4 bölgesel blok + makro stres katmanı:
 #   ASIA     — Nikkei, HSI  (ağırlık %18)
 #   EUROPE   — DAX, FTSE    (ağırlık %16)
 #   US       — SP500, NASDAQ (ağırlık %18)
