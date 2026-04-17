@@ -17,11 +17,11 @@ from services.market_data import load_terminal_data
 from services.preferences import DEFAULT_PREFERENCES, load_preferences
 
 DEFAULT_MODEL = "google/gemini-2.5-flash"
-DEFAULT_DEPTH = "Orta"
+DEFAULT_DEPTH = "Derin"
 TELEGRAM_MESSAGE_LIMIT = 2800
 ISTANBUL_TZ = ZoneInfo("Europe/Istanbul")
 
-# Rapor ar?ivi dizini
+# Rapor arsivi dizini
 REPORTS_DIR = Path("reports")
 ARCHIVE_DIR = REPORTS_DIR / "archive"
 
@@ -118,15 +118,15 @@ def generate_bulletin_report(client, context: dict, config: RuntimeConfig) -> tu
         return normalize_report_payload(None, context), True
 
 
-# ??? JSON KAYIT / AR?IV ??????????????????????????????????????????????????????
+# ??? JSON KAYIT / ARSIV ??????????????????????????????????????????????????????
 
 def save_report_to_disk(report: dict, context: dict, config: RuntimeConfig, now: datetime) -> None:
     """
     Raporu iki yere kaydeder:
-      reports/latest_2245.json  ? her zaman g�ncel
-      reports/archive/2025-04-09_2245.json  ? kal?c? ar?iv
+      reports/latest_2245.json  - her zaman güncel
+      reports/archive/2025-04-09_2245.json  - kalıcı arşiv
     
-    Ar?ivde sadece 22:45 b�ltenleri saklan?r (1630 latest olarak tutulur ama ar?ive yaz?lmaz).
+    Arşivde sadece 22:45 bültenleri saklanır (1630 latest olarak tutulur ama arşive yazılmaz).
     """
     REPORTS_DIR.mkdir(exist_ok=True)
     ARCHIVE_DIR.mkdir(exist_ok=True)
@@ -162,12 +162,12 @@ def save_report_to_disk(report: dict, context: dict, config: RuntimeConfig, now:
         "fallback_used": report.get("fallback_used", False),
     }
 
-    # Her zaman latest dosyas?n? g�ncelle
+    # Her zaman latest dosyasını güncelle
     latest_path = REPORTS_DIR / f"latest_{config.slot}.json"
     latest_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"Latest rapor kaydedildi: {latest_path}")
 
-    # Sadece 22:45 b�lteni ar?ive yaz?l?r
+    # Sadece 22:45 bülteni arşive yazılır
     if config.slot == "2245":
         archive_path = ARCHIVE_DIR / f"{now.strftime('%Y-%m-%d')}_2245.json"
         archive_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -175,7 +175,7 @@ def save_report_to_disk(report: dict, context: dict, config: RuntimeConfig, now:
 
 
 def load_latest_report(slot: str) -> dict | None:
-    """Terminal taraf?ndan kullan?l?r � en g�ncel raporu okur."""
+    """Terminal tarafından kullanılır - en güncel raporu okur."""
     path = REPORTS_DIR / f"latest_{slot}.json"
     if not path.exists():
         return None
@@ -186,7 +186,7 @@ def load_latest_report(slot: str) -> dict | None:
 
 
 def list_archive_reports() -> list[dict]:
-    """Ar?ivdeki t�m 22:45 raporlar?n? tarih azalan s?rada d�ner."""
+    """Arşivdeki tüm 22:45 raporlarını tarih azalan sırada döner."""
     if not ARCHIVE_DIR.exists():
         return []
     files = sorted(ARCHIVE_DIR.glob("*_2245.json"), reverse=True)
