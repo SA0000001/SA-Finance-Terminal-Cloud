@@ -989,8 +989,8 @@ def render_risk_on_off_panel(analytics: dict) -> None:
         if not block:
             return ""
         return (
-            f"mkt {block.get('mkt', 0):+0.1f} � stress {block.get('stress', 0):+0.1f} � "
-            f"btc-tx {block.get('btc_tx', 0):+0.1f} � prelim {block.get('prelim_factor', 0):+0.1f}"
+            f"mkt {block.get('mkt', 0):+0.1f}  stress {block.get('stress', 0):+0.1f}  "
+            f"btc-tx {block.get('btc_tx', 0):+0.1f}  prelim {block.get('prelim_factor', 0):+0.1f}"
         )
 
     def score_block(label, score, signal, color_key, sub=None, decomp_key: str | None = None) -> str:
@@ -1120,7 +1120,7 @@ def render_risk_on_off_panel(analytics: dict) -> None:
 
     phase = roo.get("phase", "NEUTRAL PHASE")
     side_bias = roo.get("side_bias", "NEUTRAL")
-    playbook = roo.get("playbook", "neutral bias � selective execution")
+    playbook = roo.get("playbook", "neutral bias  selective execution")
     confidence_tier = roo.get("confidence_tier", "MEDIUM")
     phase_color = "var(--positive)" if "BULL" in phase else "var(--negative)" if "BEAR" in phase else "var(--warning)"
     side_color = "var(--positive)" if side_bias == "LONG" else "var(--negative)" if side_bias == "SHORT" else "var(--warning)"
@@ -1211,12 +1211,12 @@ def render_risk_on_off_panel(analytics: dict) -> None:
             roo["strict_score"],
             roo["strict_signal"],
             roo["strict_color"],
-            sub=f"sync q � {roo['sync_q']}   agree q � {roo['agree_q']}",
+            sub=f"sync q  {roo['sync_q']}   agree q  {roo['agree_q']}",
             decomp_key="strict",
         )
         + "<div style='padding:14px;border-radius:var(--r-md);border:1px solid var(--border);background:rgba(255,255,255,0.022)'>"
         "<div style='display:grid;grid-template-columns:1fr 1fr;gap:12px'>"
-        "<div><div style='font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--positive);margin-bottom:8px'>? DRIVERS � LIVE NOW</div>"
+        "<div><div style='font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--positive);margin-bottom:8px'>? DRIVERS  LIVE NOW</div>"
         + (drivers_html if drivers_html else "<div style='font-size:0.78rem;color:var(--text-muted)'>Veri bekleniyor</div>")
         + "</div>"
         "<div><div style='font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--negative);margin-bottom:8px'>? DRAGS</div>"
@@ -1235,7 +1235,7 @@ def render_risk_on_off_panel(analytics: dict) -> None:
             roo["live_score"],
             roo["global_signal"],
             roo["global_color"],
-            sub=f"risk on {roo['risk_on_count']} � neutral {roo['neutral_count']} � off {roo['risk_off_count']}",
+            sub=f"risk on {roo['risk_on_count']}  neutral {roo['neutral_count']}  off {roo['risk_off_count']}",
             decomp_key="live",
         )
         + "</div>"
@@ -1351,7 +1351,7 @@ def render_signals_tab(data: dict, health_summary: dict):
             (f"{symbol} · 24h {display_value(data.get(ck, '-'))}", data.get(wk, "-"), relative_to_btc_tone(data.get(wk), btc_week))
             for _, symbol, _, ck, wk in CRYPTO_RADAR_ASSETS
         ]
-        cat("Price Snapshot", "�?")
+        cat("Price Snapshot", "?")
         render_cards(price_cards, cols=4, compact=True)
         st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
         cat("Relative Performance vs BTC", "◨")
