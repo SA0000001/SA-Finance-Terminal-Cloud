@@ -19,8 +19,8 @@ ETF_FLOW_LAYOUTS = (
     ETF_FLOW_COLUMNS,
     tuple(symbol for symbol in ETF_FLOW_COLUMNS if symbol != "MSBT"),
 )
-ETF_PLACEHOLDERS = {"", "-", "â€”"}
-PLACEHOLDER = "â€”"
+ETF_PLACEHOLDERS = {"", "-", "—"}
+PLACEHOLDER = "—"
 TEXT_ACCEPT = "text/plain, text/markdown, */*"
 DATA_PARSE_EXCEPTIONS = (KeyError, TypeError, ValueError, IndexError, ZeroDivisionError)
 YFINANCE_EXCEPTIONS = (KeyError, TypeError, ValueError, IndexError, requests.RequestException)
@@ -129,6 +129,98 @@ def _download_with_latency(symbols, *, period: str):
 
 def _set_defaults(target: dict, defaults: dict):
     target.update(defaults)
+
+
+def _compute_stock_fng() -> dict:
+    """
+    Stock Market Fear & Greed — CNN metodolojisine yakın 5 bileşenli composite.
+    CNN API sandbox ortamından erişilemediği için yfinance ile hesaplanır.
+
+    Bileşenler:
+      1. VIX seviyesi       (%25) — 12=tamam, 20=nötr, 40+=panik
+      2. SPX momentum       (%20) — 125 günlük MA'ya göre spread
+      3. Market breadth     (%20) — RSP/SPY (equal-weight/cap-weight spread)
+      4. Put/Call proxy     (%20) — VIX/VXN oranı (yaklaşık)
+      5. Safe haven demand  (%15) — TLT vs SPY 5g relatif performans
+    """
+    import numpy as np
+
+    try:
+        tickers = yf.download(
+            ["^VIX", "^GSPC", "^NDX", "SPY", "RSP", "TLT"],
+            period="130d", interval="1d", progress=False, auto_adjust=True,
+        )
+        close = tickers["Close"]
+
+        # 1. VIX bileşeni — düşük VIX = greedy
+        vix = close["^VIX"].dropna()
+        vix_now = float(vix.iloc[-1])
+        # 12→100, 20→50, 40→0
+        vix_score = max(0, min(100, int(100 - (vix_now - 12) / (40 - 12) * 100)))
+
+        # 2. SPX momentum — 125d MA'ya spread
+        spx = close["^GSPC"].dropna()
+        ma125 = float(spx.rolling(125).mean().iloc[-1])
+        spx_now = float(spx.iloc[-1])
+        spread_pct = (spx_now - ma125) / ma125 * 100  # -10%→0, 0%→50, +10%→100
+        momentum_score = max(0, min(100, int(50 + spread_pct * 5)))
+
+        # 3. Breadth — RSP vs SPY 20g performans
+        rsp = close["RSP"].dropna()
+        spy = close["SPY"].dropna()
+        rsp_ret = float(rsp.iloc[-1] / rsp.iloc[-20] - 1) * 100
+        spy_ret = float(spy.iloc[-1] / spy.iloc[-20] - 1) * 100
+        breadth_spread = rsp_ret - spy_ret  # RSP outperform → greedy
+        breadth_score = max(0, min(100, int(50 + breadth_spread * 10)))
+
+        # 4. Put/Call proxy — VIX/VXN (NDX vol / SPX vol oranı)
+        ndx_vix = close["^NDX"].dropna()
+        # NDX son 20 günün annualized return std
+        ndx_ret = ndx_vix.pct_change().dropna()
+        implied_vol_proxy = float(ndx_ret.iloc[-20:].std() * (252 ** 0.5) * 100)
+        # yüksek vol = korku
+        pcr_score = max(0, min(100, int(100 - (implied_vol_proxy - 10) / (50 - 10) * 100)))
+
+        # 5. Safe haven — TLT vs SPY 5g relatif
+        tlt = close["TLT"].dropna()
+        tlt_ret = float(tlt.iloc[-1] / tlt.iloc[-5] - 1) * 100
+        spy_ret5 = float(spy.iloc[-1] / spy.iloc[-5] - 1) * 100
+        safe_spread = tlt_ret - spy_ret5  # TLT outperform → fear
+        safe_score = max(0, min(100, int(50 - safe_spread * 8)))
+
+        # Composite
+        composite = int(
+            vix_score      * 0.25 +
+            momentum_score * 0.20 +
+            breadth_score  * 0.20 +
+            pcr_score      * 0.20 +
+            safe_score     * 0.15
+        )
+
+        def _label(s: int) -> str:
+            if s >= 75: return "Extreme Greed"
+            if s >= 55: return "Greed"
+            if s >= 45: return "Neutral"
+            if s >= 25: return "Fear"
+            return "Extreme Fear"
+
+        return {
+            "STOCK_FNG_NUM":   composite,
+            "STOCK_FNG":       f"{composite} ({_label(composite)})",
+            "STOCK_FNG_LABEL": _label(composite),
+            "STOCK_FNG_VIX":   vix_score,
+            "STOCK_FNG_MOM":   momentum_score,
+            "STOCK_FNG_BRD":   breadth_score,
+        }
+    except Exception:
+        return {
+            "STOCK_FNG_NUM":   0,
+            "STOCK_FNG":       PLACEHOLDER,
+            "STOCK_FNG_LABEL": PLACEHOLDER,
+            "STOCK_FNG_VIX":   0,
+            "STOCK_FNG_MOM":   0,
+            "STOCK_FNG_BRD":   0,
+        }
 
 
 def _parse_calendar_timestamp(date_text: str, time_text: str):
@@ -1004,7 +1096,7 @@ def _legacy_veri_motoru(fred_api_key=""):
     data["ORDERBOOK_SIGNAL_DETAIL"] = orderbook_signal["detail"]
     data["ORDERBOOK_SIGNAL_BADGE"] = orderbook_signal["badge"]
     data["ORDERBOOK_SIGNAL_CLASS"] = orderbook_signal["class"]
-    data["ORDERBOOK_SOURCES"] = "Kraken Â· OKX Â· KuCoin Â· Gate.io Â· Coinbase"
+    data["ORDERBOOK_SOURCES"] = "Kraken · OKX · KuCoin · Gate.io · Coinbase"
 
     stablecoin_response = None
     try:
@@ -1185,6 +1277,17 @@ def _legacy_veri_motoru(fred_api_key=""):
             stale_after_seconds=1800,
         )
         _set_defaults(data, {"FNG": PLACEHOLDER, "FNG_PREV": PLACEHOLDER, "FNG_NUM": 0})
+
+    # Stock Market Fear & Greed (yfinance bazlı composite)
+    try:
+        stock_fng = _compute_stock_fng()
+        data.update(stock_fng)
+    except Exception:
+        _set_defaults(data, {
+            "STOCK_FNG_NUM": 0, "STOCK_FNG": PLACEHOLDER,
+            "STOCK_FNG_LABEL": PLACEHOLDER, "STOCK_FNG_VIX": 0,
+            "STOCK_FNG_MOM": 0, "STOCK_FNG_BRD": 0,
+        })
 
     coindesk_response = None
     try:
@@ -1586,7 +1689,7 @@ def _fetch_orderbook_snapshot():
     data["ORDERBOOK_SIGNAL_DETAIL"] = signal["detail"]
     data["ORDERBOOK_SIGNAL_BADGE"] = signal["badge"]
     data["ORDERBOOK_SIGNAL_CLASS"] = signal["class"]
-    data["ORDERBOOK_SOURCES"] = "Kraken Â· OKX Â· KuCoin Â· Gate.io Â· Coinbase"
+    data["ORDERBOOK_SOURCES"] = "Kraken · OKX · KuCoin · Gate.io · Coinbase"
     data["_health"] = health.export()
     return data
 
@@ -1770,6 +1873,17 @@ def _fetch_sentiment_snapshot():
             stale_after_seconds=1800,
         )
         _set_defaults(data, {"FNG": PLACEHOLDER, "FNG_PREV": PLACEHOLDER, "FNG_NUM": 0})
+
+    # Stock Market Fear & Greed (yfinance bazlı composite)
+    try:
+        stock_fng = _compute_stock_fng()
+        data.update(stock_fng)
+    except Exception:
+        _set_defaults(data, {
+            "STOCK_FNG_NUM": 0, "STOCK_FNG": PLACEHOLDER,
+            "STOCK_FNG_LABEL": PLACEHOLDER, "STOCK_FNG_VIX": 0,
+            "STOCK_FNG_MOM": 0, "STOCK_FNG_BRD": 0,
+        })
 
     coindesk_response = None
     try:
