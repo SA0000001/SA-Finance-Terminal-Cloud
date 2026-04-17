@@ -832,7 +832,7 @@ def build_regime_scores(data: dict) -> dict:
     elif overall >= 60 and fragility["score"] <= 60:
         bias = "Risk-on korunabilir ama pozisyon boyutlari secici tutulmali."
     elif overall >= 60:
-        bias = "Yap?c? rejim var ancak crowding ve vol nedeniyle taktik kalmak gerekiyor."
+        bias = "Yapıcı rejim var ancak crowding ve vol nedeniyle taktik kalmak gerekiyor."
     elif overall >= 45:
         bias = "Kararsiz rejim; teyit gelmeden agresif pozisyon almak icin erken."
     elif factors["liquidity"]["delta_7d"] > 2:
