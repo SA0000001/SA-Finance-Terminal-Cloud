@@ -3,7 +3,7 @@ name: Daily Macro Bulten
 on:
   schedule:
     # 16:30 Istanbul (UTC+3) = 12:30 UTC
-    - cron: "30 12 * * *"
+    - cron: "30 11 * * *"
     # 22:45 Istanbul (UTC+3) = 19:45 UTC
     - cron: "45 18 * * *"
 
@@ -79,8 +79,8 @@ jobs:
             HOUR=$(date -u +%H)
             MINUTE=$(date -u +%M)
             TIME="${HOUR}${MINUTE}"
-            # 12:30 UTC → 1630 slot
-            # 19:45 UTC → 2245 slot
+            # 11:30 UTC → 1630 slot
+            # 18:45 UTC → 2245 slot
             if [ "$HOUR" -le "14" ]; then
               SLOT="1630"
             else
