@@ -224,7 +224,7 @@ Stil:
 
 Zorunlu cikti formati:
 <terminal_report>
-### SA Finance Alpha Makro Bülteni Gişis
+### SA Finance Alpha Makro Bülteni Giriş
 ### Günlük Harita ve Ana Çıkarım
 ### Makro Ortam ve Risk İştahı
 ### BTC, Türev ve Order Book Analizi
