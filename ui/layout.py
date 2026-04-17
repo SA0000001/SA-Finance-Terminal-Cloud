@@ -205,7 +205,7 @@ def _render_sidebar_preferences():
     prefs = st.session_state.get("preferences", {})
     thresholds = prefs.get("thresholds", {})
 
-    with st.expander("Görünüm ve Uyar?lar", expanded=False):
+    with st.expander("Görünüm ve Uyarılar", expanded=False):
         view_mode = st.radio(
             "Görünüm modu",
             ["Basit", "Pro"],
@@ -214,8 +214,8 @@ def _render_sidebar_preferences():
         )
         report_depth = st.selectbox(
             "Rapor seviyesi",
-            ["K?sa", "Orta", "Derin"],
-            index=["K?sa", "Orta", "Derin"].index(prefs.get("report_depth", "Orta")),
+            ["Kısa", "Orta", "Derin"],
+            index=["Kısa", "Orta", "Derin"].index(prefs.get("report_depth", "Orta")),
             key="sidebar_pref_report_depth",
         )
         pinned_metrics = st.multiselect(
@@ -227,7 +227,7 @@ def _render_sidebar_preferences():
         )
         st.markdown(
             "<div style='font-size:0.72rem;color:var(--text-muted);margin:8px 0 4px;"
-            "font-family:var(--font-mono);letter-spacing:0.1em;text-transform:uppercase'>Alarm e?ikleri</div>",
+            "font-family:var(--font-mono);letter-spacing:0.1em;text-transform:uppercase'>Alarm eşikleri</div>",
             unsafe_allow_html=True,
         )
         funding_above = st.number_input("Funding > X",     value=float(thresholds.get("funding_above", 0.01)), step=0.005, format="%.4f", key="sidebar_thr_funding")
