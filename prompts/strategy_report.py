@@ -105,6 +105,76 @@ def _format_factor_lines(scores: dict) -> str:
     )
 
 
+def _format_risk_on_off(analytics: dict) -> str:
+    roo = analytics.get("risk_on_off", {})
+    if not roo:
+        return "- Risk On/Off verisi yok"
+    tx = roo.get("cross_asset_transmission", {})
+    tx_items = tx.get("items", [])
+    tx_lines = " | ".join(
+        f"{item['pair']} {item['display']} ({item['signal']})"
+        for item in tx_items
+    ) if tx_items else "-"
+    drivers = " | ".join(
+        f"{d['label']} {d['change']}" for d in roo.get("drivers", [])
+    ) or "-"
+    drags = " | ".join(
+        f"{d['label']} {d['change']}" for d in roo.get("drags", [])
+    ) or "-"
+    return (
+        f"- Global sinyal: {_safe(roo.get('global_signal'))} | Strict: {_safe(roo.get('strict_score'))}/100 | Live: {_safe(roo.get('live_score'))}/100\n"
+        f"- Phase: {_safe(roo.get('phase'))} | Side bias: {_safe(roo.get('side_bias'))} | Confidence: {_safe(roo.get('confidence_tier'))}\n"
+        f"- Playbook: {_safe(roo.get('playbook'))}\n"
+        f"- Sync Q: {_safe(roo.get('sync_q'))} | Agree Q: {_safe(roo.get('agree_q'))} | Coverage: {_safe(roo.get('coverage'))}\n"
+        f"- Drivers: {drivers}\n"
+        f"- Drags: {drags}\n"
+        f"- Cross-asset transmission: {_safe(tx.get('signal'))} | {tx_lines}"
+    )
+
+
+def _format_decision_verdict(analytics: dict) -> str:
+    dec = analytics.get("decision", {})
+    if not dec:
+        return "- Karar verisi yok"
+    verdict = dec.get("verdict", {})
+    mqs = dec.get("mqs", {})
+    ews = dec.get("ews", {})
+    mqs_comps = " | ".join(
+        f"{c['label']} {c['score']}/100"
+        for c in mqs.get("components", [])
+    ) or "-"
+    ews_comps = " | ".join(
+        f"{c['label']} {c['score']}/100"
+        for c in ews.get("components", [])
+    ) or "-"
+    return (
+        f"- Karar: {_safe(verdict.get('verdict'))} ({_safe(verdict.get('verdict_en'))})\n"
+        f"- Özet: {_safe(verdict.get('summary'))}\n"
+        f"- Aksiyon: {_safe(verdict.get('action'))}\n"
+        f"- MQS: {_safe(mqs.get('score'))}/100 ({_safe(mqs.get('label'))}) | Güçlü: {_safe(mqs.get('strongest'))} | Zayıf: {_safe(mqs.get('weakest'))}\n"
+        f"  Bileşenler: {mqs_comps}\n"
+        f"- EWS: {_safe(ews.get('score'))}/100 ({_safe(ews.get('label'))}) | Güçlü: {_safe(ews.get('strongest'))} | Zayıf: {_safe(ews.get('weakest'))}\n"
+        f"  Bileşenler: {ews_comps}\n"
+        f"- Destek: {_safe(ews.get('support'))} | Direnç: {_safe(ews.get('resistance'))}"
+    )
+
+
+def _format_stock_fng(data: dict) -> str:
+    sfng = data.get("STOCK_FNG", "-")
+    sfng_num = data.get("STOCK_FNG_NUM", 0)
+    sfng_vix = data.get("STOCK_FNG_VIX", "-")
+    sfng_mom = data.get("STOCK_FNG_MOM", "-")
+    sfng_brd = data.get("STOCK_FNG_BRD", "-")
+    crypto_fng = data.get("FNG", "-")
+    if sfng == "-":
+        return f"- Stock F&G: veri yok | Crypto F&G: {crypto_fng}"
+    return (
+        f"- Stock Market F&G: {sfng}\n"
+        f"  VIX bileşeni: {sfng_vix}/100 | Momentum: {sfng_mom}/100 | Breadth: {sfng_brd}/100\n"
+        f"- Crypto F&G: {crypto_fng}"
+    )
+
+
 def build_strategy_report_prompt(
     data,
     brief: dict | None = None,
@@ -254,7 +324,16 @@ Canli baglam ({now_text}):
 Kaynak: {_safe(data.get('ECONOMIC_CALENDAR_SOURCE'))}
 {_format_calendar(data.get('ECONOMIC_CALENDAR', []))}
 
-13) Veri sagligi
+13) Global Risk On/Off Göstergesi
+{_format_risk_on_off(analytics)}
+
+14) Karar Motoru (MQS + EWS)
+{_format_decision_verdict(analytics)}
+
+15) Sentiment — Crypto & Stock Fear/Greed
+{_format_stock_fng(data)}
+
+16) Veri sagligi
 {_format_health(health_summary)}
 
 Ek kurallar:
@@ -271,4 +350,8 @@ Ek kurallar:
 - "BTC, Turev ve Order Book Analizi" bolumunde BTC 24s ve 7g hareketini, funding/OI/L-S/Taker verileriyle birlestir; kaldirac yogunlugu ve squeeze riskine yorum getir.
 - "ETF, Stablecoin ve Altcoinler" bolumunde ETF akisi, stablecoin buyuklugu ve altcoinlerin 24s/7g performansini BTC ile goreli kiyaslayarak yaz.
 - "Macro Breadth ve Crypto Breadth" bolumunde skor tekrari yapmak yerine katilimin genis mi dar mi oldugunu, BTC disina yayilim olup olmadigini ve uyum/ayrisma durumunu anlat.
+- "Makro Ortam ve Risk Istahi" bolumunde Global Risk On/Off sinyalini (phase, side bias, playbook) ve cross-asset transmission sonuclarini (ETH/BTC, BTC/NQ, BTC/GOLD) somut yorumla kullan.
+- "Gunluk Harita ve Ana Cikarim" bolumunde MQS ve EWS skorlarini karar algilamasina bagla: piyasa kalitesi yuksekse agresiflik, dusukse temkin vurgulansin.
+- Stock Market Fear & Greed ve Crypto Fear & Greed verilerini sentiment konfirmasyonu olarak kullan; iki endeks arasindan ayrisma varsa bunu belirt.
+- Karar Motoru'ndaki (EVET/DIKKAT/HAYIR) sonucu "Long/Short/Bekle" bolumune dogal dille entegre et; skoru aynen kopyalama.
 """
