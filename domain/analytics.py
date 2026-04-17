@@ -1302,7 +1302,7 @@ def _build_verdict(mqs: dict, ews: dict, scores: dict) -> dict:
         color = "warning"
         summary = "Karma sinyal. Sadece en yüksek kaliteli setup'larda, k—k boyutle işlem yap?labilir."
         size_guidance = "K—k boyut / seçici"
-        action = "Yalnızca en güçlü teyitlerde, küçükk boyutle işlem. Agresif pozisyon alma."
+        action = "Yalnızca en güçlü teyitlerde, küçük boyutla işlem. Agresif pozisyon alma."
     
     # Hangi koşul kararı belirliyor?
     decisive_factors = []
