@@ -1154,9 +1154,9 @@ def render_risk_on_off_panel(analytics: dict) -> None:
         bar_color = c
         # Context note per pair
         context = {
-            "ETH/BTC": "ETH g��l�yse ? kripto risk i?tah? y�ksek",
-            "BTC/NQ": "BTC g��l�yse ? risk liderli?i var",
-            "BTC/GOLD": "BTC g��l�yse ? g�venli liman ak??? zay?f",
+            "ETH/BTC": "ETH güçlüyse ? kripto risk iştahı yüksek",
+            "BTC/NQ": "BTC güçlüyse ? risk liderliği var",
+            "BTC/GOLD": "BTC güçlüyse ? güvenli liman akışı zayıf",
         }.get(pair, "")
         return (
             "<div style='padding:10px 12px;border-radius:var(--r-sm);border:1px solid " + border + ";background:" + bg + ";flex:1;min-width:0'>"
