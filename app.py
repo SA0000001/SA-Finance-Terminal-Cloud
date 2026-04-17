@@ -280,7 +280,7 @@ def render_onboarding_wizard():
             f"<div style='padding:10px 14px;border-radius:6px;border:1px solid var(--border);"
             f"background:rgba(255,255,255,0.03);font-size:0.82rem;color:var(--text-muted);"
             f"margin:10px 0 18px;line-height:1.55'>"
-            f"?��� {profile['tip']}</div>",
+            f"💡 {profile['tip']}</div>",
             unsafe_allow_html=True,
         )
 
