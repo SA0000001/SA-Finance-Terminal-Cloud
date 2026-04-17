@@ -1,5 +1,5 @@
 """
-SA Finance Alpha Terminal — Layout Module
+SA Finance Alpha Terminal � Layout Module
 Page header, Status Hub, sidebar. No business logic here.
 """
 import html as _html
@@ -18,25 +18,25 @@ def normalize_health_cell(value) -> str:
     return clean_text(normalize_health_display_text(value))
 
 
-# ─── KULLANICI DOSTU HATA MESAJLARI ──────────────────────────────────────────
+# ??? KULLANICI DOSTU HATA MESAJLARI ??????????????????????????????????????????
 
 _ERROR_PATTERNS: list[tuple[str, str]] = [
-    (r"HTTP 4(0[13]|29)",   "Veri kaynağı erişim reddetti — yakında otomatik yeniden denenecek."),
-    (r"HTTP 404",           "Veri kaynağı adresi değişmiş olabilir — geçici olarak atlanıyor."),
-    (r"HTTP 5\d\d",         "Veri kaynağı sunucu tarafında hata verdi — genellikle kısa sürede düzelir."),
-    (r"timeout|Timeout|timed out", "Veri kaynağına bağlanılamadı (zaman aşımı) — otomatik yeniden denenecek."),
-    (r"Connection|connection refused", "Veri kaynağına bağlantı kurulamadı — internet bağlantısını kontrol et."),
-    (r"JSONDecodeError|json|JSON",     "Veri kaynağından beklenmedik yanıt geldi — geçici olarak atlanıyor."),
-    (r"KeyError|IndexError|TypeError", "Veri formatı değişmiş olabilir — kaynak güncelleniyor."),
-    (r"Rate limit|rate limit|429",     "Veri kaynağı sorgu limitine ulaşıldı — biraz bekle, otomatik devam edecek."),
-    (r"SSL|ssl|certificate",           "Güvenli bağlantı hatası — veri kaynağı geçici olarak erişilemez."),
-    (r"No data|empty|boş",             "Bu kaynaktan şu an veri gelmiyor — bir sonraki güncellemeye kadar bekleniyor."),
+    (r"HTTP 4(0[13]|29)",   "Veri kayna?? eri?im reddetti � yak?nda otomatik yeniden denenecek."),
+    (r"HTTP 404",           "Veri kayna?? adresi de?i?mi? olabilir � ge�ici olarak atlan?yor."),
+    (r"HTTP 5\d\d",         "Veri kayna?? sunucu taraf?nda hata verdi � genellikle k?sa s�rede d�zelir."),
+    (r"timeout|Timeout|timed out", "Veri kayna??na ba?lan?lamad? (zaman a??m?) � otomatik yeniden denenecek."),
+    (r"Connection|connection refused", "Veri kayna??na ba?lant? kurulamad? � internet ba?lant?s?n? kontrol et."),
+    (r"JSONDecodeError|json|JSON",     "Veri kayna??ndan beklenmedik yan?t geldi � ge�ici olarak atlan?yor."),
+    (r"KeyError|IndexError|TypeError", "Veri format? de?i?mi? olabilir � kaynak g�ncelleniyor."),
+    (r"Rate limit|rate limit|429",     "Veri kayna?? sorgu limitine ula??ld? � biraz bekle, otomatik devam edecek."),
+    (r"SSL|ssl|certificate",           "G�venli ba?lant? hatas? � veri kayna?? ge�ici olarak eri?ilemez."),
+    (r"No data|empty|bo?",             "Bu kaynaktan ?u an veri gelmiyor � bir sonraki g�ncellemeye kadar bekleniyor."),
 ]
-_ERROR_FALLBACK = "Veri kaynağında geçici bir sorun var — otomatik olarak yeniden denenecek."
+_ERROR_FALLBACK = "Veri kayna??nda ge�ici bir sorun var � otomatik olarak yeniden denenecek."
 
 
 def friendly_error(raw: str) -> str:
-    """Teknik hata metnini kullanıcı dostu Türkçeye çevirir."""
+    """Teknik hata metnini kullan?c? dostu T�rk�eye �evirir."""
     if not raw or raw in ("-", ""):
         return _ERROR_FALLBACK
     for pattern, message in _ERROR_PATTERNS:
@@ -53,7 +53,7 @@ def render_page_header(last_updated: str, health_summary: dict, brief: dict, pre
         phase = roo.get("phase", "NEUTRAL PHASE")
         side = roo.get("side_bias", "NEUTRAL")
         conf = roo.get("confidence_tier", "MEDIUM")
-        playbook = roo.get("playbook", "neutral bias · selective execution")
+        playbook = roo.get("playbook", "neutral bias � selective execution")
         phase_color = "var(--positive)" if "BULL" in phase else "var(--negative)" if "BEAR" in phase else "var(--warning)"
         side_color = "var(--positive)" if side == "LONG" else "var(--negative)" if side == "SHORT" else "var(--warning)"
         ops_html = (
@@ -65,7 +65,7 @@ def render_page_header(last_updated: str, health_summary: dict, brief: dict, pre
             f'<span style="padding:2px 6px;border:1px solid var(--border);border-radius:999px;font-family:var(--font-mono);font-size:0.62rem;color:var(--text-muted)">CONF {esc(conf)}</span>'
             '<span style="padding:2px 6px;border:1px solid var(--positive);border-radius:999px;font-family:var(--font-mono);font-size:0.62rem;color:var(--positive)">LIVE</span>'
             "</div>"
-            f'<div style="font-family:var(--font-mono);font-size:0.62rem;color:var(--text-muted)">Playbook · <span style="color:var(--text-primary)">{esc(playbook)}</span></div>'
+            f'<div style="font-family:var(--font-mono);font-size:0.62rem;color:var(--text-muted)">Playbook � <span style="color:var(--text-primary)">{esc(playbook)}</span></div>'
             "</div>"
         )
 
@@ -78,7 +78,7 @@ def render_page_header(last_updated: str, health_summary: dict, brief: dict, pre
             (bi_label("Market State", "Piyasa Durumu"), scores["overlay"]),
             (bi_label("Regime Score", "Rejim Skoru"),   f"{scores['overall']}/100"),
             (bi_label("Fragility",    "Kirilganlik"),   scores["fragility"]["label"]),
-            (bi_label("Confidence",   "Guven"),         f"{scores['confidence']}/100 · {scores['confidence_label']}"),
+            (bi_label("Confidence",   "Guven"),         f"{scores['confidence']}/100 � {scores['confidence_label']}"),
         ]
     )
 
@@ -97,12 +97,12 @@ def render_page_header(last_updated: str, health_summary: dict, brief: dict, pre
             <div class="t-header-right">
                 <div class="t-pill-row">
                     <span class="t-pill">Canli veri</span>
-                    <span class="t-pill">Mod · {esc(preferences.get("view_mode", "Basit"))}</span>
+                    <span class="t-pill">Mod � {esc(preferences.get("view_mode", "Basit"))}</span>
                     <span class="t-badge">v20.0</span>
                 </div>
                 <div class="t-meta">
-                    Istanbul · {esc(last_updated)}<br/>
-                    Bias · {esc(scores["bias"])}
+                    Istanbul � {esc(last_updated)}<br/>
+                    Bias � {esc(scores["bias"])}
                 </div>
                 {ops_html}
             </div>
@@ -112,14 +112,14 @@ def render_page_header(last_updated: str, health_summary: dict, brief: dict, pre
     )
     render_health_bar(health_summary)
 
-    # ── Sayfa yönlendirme notu ────────────────────────────────────────────────
+    # ?? Sayfa y�nlendirme notu ????????????????????????????????????????????????
     st.markdown(
-        "<div class='section-notice'>Rejim merkezi → sekme detayları → atlas. Üst yüzey karar verir, alt yüzeyler teyit eder.</div>",
+        "<div class='section-notice'>Rejim merkezi ? sekme detaylar? ? atlas. �st y�zey karar verir, alt y�zeyler teyit eder.</div>",
         unsafe_allow_html=True,
     )
 
 
-# ─── STATUS HUB ──────────────────────────────────────────────────────────────
+# ??? STATUS HUB ??????????????????????????????????????????????????????????????
 
 def render_status_hub(last_updated: str, health_summary: dict, alerts: list[dict], analytics: dict):
     issue_rows  = [r for r in health_summary.get("rows", []) if r.get("Durum") != "OK"]
@@ -128,9 +128,9 @@ def render_status_hub(last_updated: str, health_summary: dict, alerts: list[dict
     alert_count = len(alerts)
 
     summary_copy = (
-        f"{issue_count} kaynak dikkat istiyor — detaylar aşağıda."
+        f"{issue_count} kaynak dikkat istiyor � detaylar a?a??da."
         if issue_count
-        else "Kritik veri sorunu yok. Health detayı gerektiğinde açılır."
+        else "Kritik veri sorunu yok. Health detay? gerekti?inde a�?l?r."
     )
 
     stats_html = "".join(
@@ -160,7 +160,7 @@ def render_status_hub(last_updated: str, health_summary: dict, alerts: list[dict
     )
 
     if issue_rows:
-        with st.expander(f"Veri kaynağı sorunları ({issue_count})", expanded=False):
+        with st.expander(f"Veri kayna?? sorunlar? ({issue_count})", expanded=False):
             for row in issue_rows[:6]:
                 source       = normalize_health_cell(row.get("Kaynak"))
                 raw_error    = normalize_health_cell(row.get("Hata"))
@@ -189,33 +189,33 @@ def render_status_hub(last_updated: str, health_summary: dict, alerts: list[dict
 def render_health_panel(health_summary: dict):
     rows = health_summary.get("rows", [])
     if not rows:
-        st.info("Veri sağlığı bilgisi henüz oluşmadı.")
+        st.info("Veri sa?l??? bilgisi hen�z olu?mad?.")
         return
     c1, c2, c3 = st.columns(3)
-    c1.metric("Sağlıklı",   health_summary.get("healthy_sources", 0))
-    c2.metric("Başarısız",  len(health_summary.get("failed_sources", [])))
+    c1.metric("Sa?l?kl?",   health_summary.get("healthy_sources", 0))
+    c2.metric("Ba?ar?s?z",  len(health_summary.get("failed_sources", [])))
     c3.metric("Stale",      len(health_summary.get("stale_sources", [])))
     st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
 
-# ─── SIDEBAR ─────────────────────────────────────────────────────────────────
+# ??? SIDEBAR ?????????????????????????????????????????????????????????????????
 
 def _render_sidebar_preferences():
-    """Sidebar'da kalıcı Görünüm ve Uyarılar paneli."""
+    """Sidebar'da kal?c? G�r�n�m ve Uyar?lar paneli."""
     prefs = st.session_state.get("preferences", {})
     thresholds = prefs.get("thresholds", {})
 
-    with st.expander("Görünüm ve Uyarılar", expanded=False):
+    with st.expander("G�r�n�m ve Uyar?lar", expanded=False):
         view_mode = st.radio(
-            "Görünüm modu",
+            "G�r�n�m modu",
             ["Basit", "Pro"],
             index=0 if prefs.get("view_mode") == "Basit" else 1,
             key="sidebar_pref_view_mode",
         )
         report_depth = st.selectbox(
             "Rapor seviyesi",
-            ["Kısa", "Orta", "Derin"],
-            index=["Kısa", "Orta", "Derin"].index(prefs.get("report_depth", "Orta")),
+            ["K?sa", "Orta", "Derin"],
+            index=["K?sa", "Orta", "Derin"].index(prefs.get("report_depth", "Orta")),
             key="sidebar_pref_report_depth",
         )
         pinned_metrics = st.multiselect(
@@ -227,7 +227,7 @@ def _render_sidebar_preferences():
         )
         st.markdown(
             "<div style='font-size:0.72rem;color:var(--text-muted);margin:8px 0 4px;"
-            "font-family:var(--font-mono);letter-spacing:0.1em;text-transform:uppercase'>Alarm eşikleri</div>",
+            "font-family:var(--font-mono);letter-spacing:0.1em;text-transform:uppercase'>Alarm e?ikleri</div>",
             unsafe_allow_html=True,
         )
         funding_above = st.number_input("Funding > X",     value=float(thresholds.get("funding_above", 0.01)), step=0.005, format="%.4f", key="sidebar_thr_funding")
@@ -235,7 +235,7 @@ def _render_sidebar_preferences():
         etf_flow      = st.number_input("ETF netflow < Z", value=float(thresholds.get("etf_flow_below", 0.0)), step=10.0,  format="%.1f", key="sidebar_thr_etf")
         dxy_above     = st.number_input("DXY > W",         value=float(thresholds.get("dxy_above", 105.0)),    step=0.5,   format="%.2f", key="sidebar_thr_dxy")
 
-        if st.button("Ayarları Kaydet", key="sidebar_pref_save", use_container_width=True):
+        if st.button("Ayarlar? Kaydet", key="sidebar_pref_save", use_container_width=True):
             prefs["view_mode"]      = view_mode
             prefs["report_depth"]   = report_depth
             prefs["pinned_metrics"] = pinned_metrics[:8]
@@ -252,14 +252,14 @@ def _render_sidebar_preferences():
 
 def render_sidebar(data, brief, last_updated: str, health_summary: dict, preferences: dict, alerts: list[dict], analytics: dict | None = None):
     with st.sidebar:
-        # ── Başlık + zaman ────────────────────────────────────────────────────
+        # ?? Ba?l?k + zaman ????????????????????????????????????????????????????
         st.markdown(
             '<div class="s-kicker" style="margin-bottom:4px">SA Finance Terminal</div>'
             f'<div style="font-size:0.74rem;color:var(--text-muted);margin-bottom:4px">{esc(last_updated)}</div>',
             unsafe_allow_html=True,
         )
 
-        # ── Operasyon butonları ───────────────────────────────────────────────
+        # ?? Operasyon butonlar? ???????????????????????????????????????????????
         b1, b2 = st.columns(2)
         with b1:
             if st.button("Verileri Yenile", key="sidebar_refresh", use_container_width=True):
@@ -271,7 +271,7 @@ def render_sidebar(data, brief, last_updated: str, health_summary: dict, prefere
                 columns=["Metrik", "Deger"],
             )
             st.download_button(
-                "CSV İndir",
+                "CSV ?ndir",
                 export_df.to_csv(index=False, sep=";").encode("utf-8-sig"),
                 file_name=f"AlphaTerminal_{pd.Timestamp.now().strftime('%Y%m%d_%H%M')}.csv",
                 mime="text/csv",
@@ -281,7 +281,7 @@ def render_sidebar(data, brief, last_updated: str, health_summary: dict, prefere
 
         st.divider()
 
-        # ── Operasyon Merkezi (status hub) ────────────────────────────────────
+        # ?? Operasyon Merkezi (status hub) ????????????????????????????????????
         scores      = (analytics or {}).get("scores", {})
         confidence  = scores.get("confidence", "-") if scores else "-"
         issue_rows  = [r for r in health_summary.get("rows", []) if r.get("Durum") != "OK"]
@@ -293,13 +293,13 @@ def render_sidebar(data, brief, last_updated: str, health_summary: dict, prefere
             f'<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:6px">'
             f'<span style="font-size:0.7rem;color:var(--text-muted)">Alarmlar <strong style="color:var(--text-primary)">{alert_count}</strong></span>'
             f'<span style="font-size:0.7rem;color:var(--text-muted)">Sorunlar <strong style="color:{"var(--negative)" if issue_count else "var(--positive)"}">{issue_count}</strong></span>'
-            f'<span style="font-size:0.7rem;color:var(--text-muted)">Güven <strong style="color:var(--text-primary)">{confidence}/100</strong></span>'
+            f'<span style="font-size:0.7rem;color:var(--text-muted)">G�ven <strong style="color:var(--text-primary)">{confidence}/100</strong></span>'
             f'</div>',
             unsafe_allow_html=True,
         )
 
         if issue_rows:
-            with st.expander(f"Veri kaynağı sorunları ({issue_count})", expanded=False):
+            with st.expander(f"Veri kayna?? sorunlar? ({issue_count})", expanded=False):
                 for row in issue_rows[:6]:
                     source    = normalize_health_cell(row.get("Kaynak"))
                     raw_error = normalize_health_cell(row.get("Hata"))
@@ -317,23 +317,23 @@ def render_sidebar(data, brief, last_updated: str, health_summary: dict, prefere
 
         st.divider()
 
-        # ── AGGR linki ────────────────────────────────────────────────────────
+        # ?? AGGR linki ????????????????????????????????????????????????????????
         st.link_button(
-            "⬡ AGGR · Canlı Orderflow",
+            "? AGGR � Canl? Orderflow",
             "https://aggr.trade/brutalbtc-copy-1",
             use_container_width=True,
         )
 
         st.divider()
 
-        # ── Görünüm ve Uyarılar ───────────────────────────────────────────────
+        # ?? G�r�n�m ve Uyar?lar ???????????????????????????????????????????????
         _render_sidebar_preferences()
 
         st.divider()
         st.markdown(
-            """**Veri Kaynakları**
-`Coinpaprika` · `Kraken` · `OKX` · `KuCoin` · `Gate.io` · `Coinbase`
-`DeFiLlama` · `yFinance` · `TradingView` · `FRED` · `CoinDesk`
+            """**Veri Kaynaklar?**
+`Coinpaprika` � `Kraken` � `OKX` � `KuCoin` � `Gate.io` � `Coinbase`
+`DeFiLlama` � `yFinance` � `TradingView` � `FRED` � `CoinDesk`
 
 **Model**
 `Gemini 2.5 Flash`""",
