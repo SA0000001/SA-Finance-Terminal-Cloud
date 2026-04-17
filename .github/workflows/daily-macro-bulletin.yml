@@ -3,7 +3,7 @@ name: Daily Macro Bulten
 on:
   schedule:
     # 16:30 Istanbul (UTC+3) = 12:30 UTC
-    - cron: "30 11 * * *"
+    - cron: "30 12 * * *"
     # 22:45 Istanbul (UTC+3) = 19:45 UTC
     - cron: "45 18 * * *"
 
