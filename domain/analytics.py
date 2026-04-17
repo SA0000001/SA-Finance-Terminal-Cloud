@@ -33,7 +33,7 @@ METRIC_LABELS = {
     "FED": "FED",
 }
 
-# Metrik ba?vuru e?ikleri — data table card'larda ba?lam notu olarak gsterilir
+# Metrik başvuru eşikleri — data table card'larda bağlam notu olarak gsterilir
 METRIC_CONTEXT: dict[str, str] = {
     "FR":              "Nötr: 0% · Dikkat: >+0.01% · Aşırı: >+0.03%",
     "FNG":             "Aşırı Korku: 0–24 · Korku: 25–44 · Nötr: 45–55 · Açgözlülük: 56–74 · Aşırı: 75–100",
@@ -122,17 +122,17 @@ def _factor_state(score: int) -> str:
     if score >= 75:
         return "G—l destek"
     if score >= 60:
-        return "Yap?c?"
+        return "Yapıcı"
     if score >= 45:
-        return "Kar???k"
+        return "Karışık"
     if score >= 30:
-        return "K?r?gan"
+        return "Kırılgan"
     return "Stresli"
 
 
 def _factor_trend_text(delta_7d: int) -> str:
     if delta_7d >= 4:
-        return "?yile?iyor"
+        return "iyileşiyor"
     if delta_7d <= -4:
         return "Bozuluyor"
     return "Dengeleniyor"
@@ -826,7 +826,7 @@ def build_regime_scores(data: dict) -> dict:
     elif overall >= 60 and fragility["score"] <= 60:
         bias = "Risk-on korunabilir ama pozisyon boyutlari secici tutulmali."
     elif overall >= 60:
-        bias = "Yap?c? rejim var ancak crowding ve vol nedeniyle taktik kalmak gerekiyor."
+        bias = "Yapıcı rejim var ancak crowding ve vol nedeniyle taktik kalmak gerekiyor."
     elif overall >= 45:
         bias = "Kararsiz rejim; teyit gelmeden agresif pozisyon almak icin erken."
     elif factors["liquidity"]["delta_7d"] > 2:
@@ -852,7 +852,7 @@ def build_regime_scores(data: dict) -> dict:
     if factors["positioning"]["score"] < 50:
         invalidate_conditions.append("Funding, L/S ve taker tek yone daha fazla yigilirsa crowding artar.")
     if factors["liquidity"]["score"] < 55:
-        invalidate_conditions.append("ETF akisi zayiflar ve DXY sert yukselirse likidite deste?i kaybolur.")
+        invalidate_conditions.append("ETF akisi zayiflar ve DXY sert yukselirse likidite desteği kaybolur.")
     if not invalidate_conditions:
         invalidate_conditions.append("Belirgin invalidate kosulu yok; mevcut rejim saglikli gorunuyor.")
 
@@ -959,7 +959,7 @@ def build_alerts(data: dict, thresholds: dict) -> list[dict]:
         alerts.append(
             {
                 "title": "DXY alarmi",
-                "detail": f"DXY {data.get('DXY', PLACEHOLDER)} | esik {dxy_above:.2f} — g—l dolar kripto iin bask?c?",
+                "detail": f"DXY {data.get('DXY', PLACEHOLDER)} | esik {dxy_above:.2f} — g—l dolar kripto iin baskıcı",
                 "level": "warning",
             }
         )
@@ -1061,23 +1061,23 @@ def build_analytics_payload(data: dict) -> dict:
 #
 # MQS — Market Quality Score
 #   "Piyasa ortamı işlem iin elverişli mi?"
-#   Mevcut 4 faktrden tretilir; ağırl?klar biraz farkl? yorumlan?r.
+#   Mevcut 4 faktrden tretilir; ağırlıklar biraz farklı yorumlanır.
 #
 # EWS — Execution Window Score
-#   "?u an işlem zamanlamas? uygun mu?"
-#   Kırılmalar tutunuyor mu, geri çekilmeler f?rsat m??
-#   Order book + volatility + momentum odakl?.
+#   "Şu an işlem zamanlaması uygun mu?"
+#   Kırılmalar tutunuyor mu, geri çekilmeler fırsat mı?
+#   Order book + volatility + momentum odaklı.
 #
 # Verdict: EVET / DİKKAT / HAYIR
 #
 
 def _build_mqs(scores: dict) -> dict:
     """
-    Market Quality Score — piyasa ortamın?n işlem iin ne kadar elverişli oldu?unu ler.
-    Mevcut faktrlerin ağırl?kl? kompoziti; fragility cezas? uygulan?r.
+    Market Quality Score — piyasa ortamının işlem iin ne kadar elverişli olduğunu işler.
+    Mevcut faktrlerin ağırlıklı kompoziti; fragility cezası uygulanır.
     
-    Bile?enler:
-      Liquidity    %30  — para ak??? ve dolar bask?s?
+    Bileşenler:
+      Liquidity    %30  — para akıcı ve dolar baskısı
       Volatility   %25  — VIX ve BTC volatilitesi
       Positioning  %20  — crowding ve dengesiz pozisyonlar
       Participation %25 — macro + crypto breadth uyumu
@@ -1097,17 +1097,17 @@ def _build_mqs(scores: dict) -> dict:
         part * 0.25
     )
     
-    # Fragility cezas?: fragility 35 stnde her puan %0.22 d?rr
+    # Fragility cezası: fragility 35 üstünde her puan %0.22 dir
     frag_penalty = max(0.0, (frag - 35) * 0.22)
     
-    # Alignment gap cezas?
+    # Alignment gap cezası
     m_bread = scores["participation"]["subfactors"]["macro"]["score"]
     c_bread = scores["participation"]["subfactors"]["crypto"]["score"]
     gap_penalty = max(0.0, (abs(m_bread - c_bread) - 10) * 0.25)
     
     mqs = clamp_score(base - frag_penalty - gap_penalty)
     
-    # Bile?en da??l?m? (grsel bar iin)
+    # Bileşen dağılımı (görsel bar için)
     components = [
         {"key": "liquidity",    "label": "Liquidity",    "score": liq,  "weight": 30},
         {"key": "volatility",   "label": "Volatility",   "score": vol,  "weight": 25},
@@ -1115,18 +1115,18 @@ def _build_mqs(scores: dict) -> dict:
         {"key": "participation","label": "Participation","score": part, "weight": 25},
     ]
     
-    # En g—l ve en zay?f bile?en
+    # En g—l ve en zayıf bileşen
     strongest = max(components, key=lambda c: c["score"])
     weakest   = min(components, key=lambda c: c["score"])
     
     if mqs >= 62:
-        label = "Elveri?li"
+        label = "Elverişli"
         color = "positive"
     elif mqs >= 45:
-        label = "Kar???k"
+        label = "Karışık"
         color = "warning"
     else:
-        label = "Elveri?siz"
+        label = "Elverişsiz"
         color = "negative"
     
     return {
@@ -1143,21 +1143,21 @@ def _build_mqs(scores: dict) -> dict:
 
 def _build_ews(data: dict, scores: dict) -> dict:
     """
-    Execution Window Score — ?u an işlem zamanlamas? uygun mu?
-    Order book, momentum ve volatility h?z?na bakarak kırılma/geri çekilme
-    kalitesini de?erlendirir.
+    Execution Window Score — şu an işlem zamanlaması uygun mu?
+    Order book, momentum ve volatility hızına bakarak kırılma/geri çekilme
+    kalitesini değerlendirir.
     
-    Bile?enler:
-      Order book signal  %30  — destek/direnç sa?laml???
-      Momentum quality   %25  — fiyat-ak?? uyumu
-      Vol regime         %25  — ani ?ok riski
-      Positioning room   %20  — squeeze ve crowding alan?
+    Bileşenler:
+      Order book signal  %30  — destek/direnç sağlamlığı
+      Momentum quality   %25  — fiyat-akşı uyumu
+      Vol regime         %25  — ani şok riski
+      Positioning room   %20  — squeeze ve crowding alanı
     """
     factors = {f["key"]: f for f in scores["factors"]}
     
     # Order book kalitesi
     ob_signal = data.get("ORDERBOOK_SIGNAL", "")
-    ob_score = 55  # varsay?lan nötr
+    ob_score = 55  # varsayılan nötr
     if isinstance(ob_signal, str):
         sig_lower = ob_signal.lower()
         if any(w in sig_lower for w in ["strong buy", "buy", "support"]):
@@ -1185,10 +1185,10 @@ def _build_ews(data: dict, scores: dict) -> dict:
     elif abs(btc_change) < 0.5:
         momentum_score = 55  # dz, belirsiz
     
-    # Vol rejimi — ani ?ok riski
+    # Vol rejimi — ani şok riski
     vol_score = factors["volatility"]["score"]
     
-    # Positioning alan? — crowding ne kadar?
+    # Positioning alanı — crowding ne kadar?
     pos_score = factors["positioning"]["score"]
     
     base = (
@@ -1211,13 +1211,13 @@ def _build_ews(data: dict, scores: dict) -> dict:
     weakest   = min(components, key=lambda c: c["score"])
     
     if ews >= 62:
-        label = "Pencere A?k"
+        label = "Pencere Açık"
         color = "positive"
     elif ews >= 45:
         label = "Dikkatli Ol"
         color = "warning"
     else:
-        label = "Pencere Kapal?"
+        label = "Pencere Kapalı"
         color = "negative"
     
     # Destek / direnç seviyeleri
@@ -1239,10 +1239,10 @@ def _build_ews(data: dict, scores: dict) -> dict:
 
 def _build_verdict(mqs: dict, ews: dict, scores: dict) -> dict:
     """
-    EVET / DİKKAT / HAYIR karar?n? retir.
+    EVET / DİKKAT / HAYIR kararını retir.
     
     EVET:    MQS ? 60 VE EWS ? 58 VE fragility < 65
-    DİKKAT: Yukar?dakilerin baz?lar? sa?lan?yor ama hepsi de?il
+    DİKKAT: Yukarıdakilerin bazıları sağlanıyor ama hepsi değil
     HAYIR:   MQS < 45 VEYA EWS < 40 VEYA fragility ? 70
     """
     mqs_s  = mqs["score"]
@@ -1250,7 +1250,7 @@ def _build_verdict(mqs: dict, ews: dict, scores: dict) -> dict:
     frag_s = scores["fragility"]["score"]
     overall = scores["overall"]
     
-    # HAYIR ko?ullar?
+    # HAYIR koşulları
     hard_no = (
         mqs_s < 36 or
         ews_s < 34 or
@@ -1258,7 +1258,7 @@ def _build_verdict(mqs: dict, ews: dict, scores: dict) -> dict:
         overall < 30
     )
     
-    # EVET ko?ullar?
+    # EVET koşulları
     strong_yes = (
         mqs_s >= 60 and
         ews_s >= 58 and
@@ -1266,45 +1266,45 @@ def _build_verdict(mqs: dict, ews: dict, scores: dict) -> dict:
         overall >= 55
     )
     
-    # DİKKAT ko?ullar? — ikisi aras?nda kalan alan
-    # hard_no de?il ve strong_yes de?ilse otomatik DİKKAT devreye girer
-    # Ek kontrol: en az biri 45+ olmal?
+    # DİKKAT koşulları — ikisi arasında kalan alan
+    # hard_no değil ve strong_yes değilse otomatik DİKKAT devreye girer
+    # Ek kontrol: en az biri 45+ olmalı
     at_least_one_ok = mqs_s >= 45 or ews_s >= 45
     
     if hard_no and not at_least_one_ok:
         verdict = "HAYIR"
         verdict_en = "NO TRADE"
         color = "negative"
-        summary = "Piyasa ortamı veya işlem penceresi yeni pozisyon iin elverişli de?il. Kenarda dur, teyit bekle."
+        summary = "Piyasa ortamı veya işlem penceresi yeni pozisyon iin elverişli değil. Kenarda dur, teyit bekle."
         size_guidance = "0%"
-        action = "Kenarda kal. Mevcut pozisyonlar? koru, yeni ama."
+        action = "Kenarda kal. Mevcut pozisyonları koru, yeni ama."
     elif hard_no:
         verdict = "DİKKAT"
         verdict_en = "SELECTIVE"
         color = "warning"
-        summary = "Ko?ullar zay?f. Mevcut a?k pozisyonlar? koru, yeni pozisyon açmaktan ka?n."
+        summary = "Koşullar zayıf. Mevcut açık pozisyonları koru, yeni pozisyon açmaktan kaçın."
         size_guidance = "0% — yeni pozisyon yok"
-        action = "Yeni pozisyon açma. Mevcut pozisyonlarda stop'lar? s?k?la?t?r."
+        action = "Yeni pozisyon açma. Mevcut pozisyonlarda stop'ları sıkılaştır."
     elif strong_yes:
         verdict = "EVET"
         verdict_en = "GO"
         color = "positive"
-        summary = "Piyasa kalitesi ve işlem penceresi uyumlu. Teyitli setup'larda pozisyon al?nabilir."
+        summary = "Piyasa kalitesi ve işlem penceresi uyumlu. Teyitli setup'larda pozisyon alınabilir."
         # Boyut nerisi: overall ve MQS'e gre
         if overall >= 70 and mqs_s >= 70:
             size_guidance = "Tam boyut"
         else:
-            size_guidance = "Seçici / yar? boyut"
-        action = "Teyitli setup'larda pozisyon al?nabilir. Boyut: " + size_guidance
+            size_guidance = "Seçici / yarı boyut"
+        action = "Teyitli setup'larda pozisyon alınabilir. Boyut: " + size_guidance
     else:
         verdict = "DİKKAT"
         verdict_en = "SELECTIVE"
         color = "warning"
         summary = "Karma sinyal. Sadece en yüksek kaliteli setup'larda, k—k boyutle işlem yap?labilir."
         size_guidance = "K—k boyut / seçici"
-        action = "Yaln?zca en g—l teyitlerde, k—k boyutle işlem. Agresif pozisyon alma."
+        action = "Yalnızca en g—l teyitlerde, k—k boyutle işlem. Agresif pozisyon alma."
     
-    # Hangi ko?ul karar? belirliyor?
+    # Hangi koşul kararı belirliyor?
     decisive_factors = []
     if mqs_s < 45:
         decisive_factors.append(f"MQS d?k ({mqs_s}/100)")
@@ -1334,7 +1334,7 @@ def _build_verdict(mqs: dict, ews: dict, scores: dict) -> dict:
 
 def build_decision_verdict(data: dict, scores: dict) -> dict:
     """
-    Ana giri? noktas?. analytics payload'a eklenir.
+    Ana giriş noktası. analytics payload'a eklenir.
     Döner:
       verdict  — EVET / DİKKAT / HAYIR karar?
       mqs      — Market Quality Score detay?
@@ -1353,21 +1353,21 @@ def build_decision_verdict(data: dict, scores: dict) -> dict:
 # ??? RISK ON/OFF INDICATOR ????????????????????????????????????????????????????
 #
 # 4 bölgesel blok + makro stres katman?:
-#   ASIA     — Nikkei, HSI  (ağırl?k %18)
-#   EUROPE   — DAX, FTSE    (ağırl?k %16)
-#   US       — SP500, NASDAQ (ağırl?k %18)
-#   CRYPTO   — BTC, ETH     (ağırl?k %18)
-#   MACRO STRESS — DXY, VIX, US10Y, OIL, GOLD (ağırl?k %30)
+#   ASIA     — Nikkei, HSI  (ağırlık %18)
+#   EUROPE   — DAX, FTSE    (ağırlık %16)
+#   US       — SP500, NASDAQ (ağırlık %18)
+#   CRYPTO   — BTC, ETH     (ağırlık %18)
+#   MACRO STRESS — DXY, VIX, US10Y, OIL, GOLD (ağırlık %30)
 #
 # Her bölge iin:
-#   - Bile?ik skor (ağırl?kl? de?i?im ortalamas?)
+#   - Bileşik skor (ağırlıklı değişim ortalaması)
 #   - Breadth (ka tanesi pozitif)
 #   - Agreement (breadth / toplam, %)
 #   - Sinyal: RISK ON / NEUTRAL / RISK OFF
 #
-# Global skor: bölge skorlar?n?n ağırl?kl? ortalamas?
-# Sync Q:    bölgeler aras? uyum (agreement)
-# Agree Q:   tüm varl?klar iinde pozitif olanlar?n oran?
+# Global skor: bölge skorlarının ağırlıklı ortalaması
+# Sync Q:    bölgeler arası uyum (agreement)
+# Agree Q:   tüm varlıklar iinde pozitif olanların oranı
 #
 
 def _pct(value) -> float | None:
@@ -1377,13 +1377,13 @@ def _pct(value) -> float | None:
 
 
 def _weighted_change_score(changes: list[float | None], weights: list[float]) -> float:
-    """A??rl?kl? de?i?im ortalamas? ? normalize edilmi? 0-100 skor"""
+    """Ağırlıklı değişim ortalaması ? normalize edilmiş 0-100 skor"""
     total_w = 0.0
     total_s = 0.0
     for c, w in zip(changes, weights):
         if c is None:
             continue
-        # +/-5% aral???n? 0-100'e normalize et
+        # +/-5% aralığını 0-100'e normalize et
         normalized = max(0.0, min(100.0, (c + 5.0) / 10.0 * 100.0))
         total_s += normalized * w
         total_w += w
@@ -1393,7 +1393,7 @@ def _weighted_change_score(changes: list[float | None], weights: list[float]) ->
 
 
 def _breadth(changes: list[float | None]) -> tuple[int, int]:
-    """(pozitif_say?s?, toplam_geerli_say?s?)"""
+    """(pozitif_sayısı, toplam_geerli_sayısı)"""
     valid = [c for c in changes if c is not None]
     pos   = sum(1 for c in valid if c > 0)
     return pos, len(valid)
@@ -1424,7 +1424,7 @@ def _build_region(
     score      = _weighted_change_score(changes, weights)
     signal     = _region_signal(score, brd_pct)
 
-    # De?i?im de?erlerini gösterim iin formatla
+    # Değıişim değerlerini gösterim iin formatla
     asset_rows = []
     for (lbl, ck, _), chg in zip(assets, changes):
         asset_rows.append({
@@ -1453,7 +1453,7 @@ def _build_region(
 def _build_macro_stress_block(data: dict) -> dict:
     """
     DXY, VIX, US10Y ? stres gstergeleri (yüksek = risk-off sinyali ? ters evrilir)
-    OIL, GOLD ? kar???k sinyal (her ikisi de izlenir)
+    OIL, GOLD ? karışıkk sinyal (her ikisi de izlenir)
     """
     dxy_c   = _pct(data.get("DXY_C"))
     vix_c   = _pct(data.get("VIX_C"))
@@ -1461,22 +1461,22 @@ def _build_macro_stress_block(data: dict) -> dict:
     oil_c   = _pct(data.get("OIL_C"))
     gold_c  = _pct(data.get("GOLD_C"))
 
-    # Stres bile?enleri: DXY? VIX? US10Y? = risk-off ? ters normalize
+    # Stres bileşenleri: DXY? VIX? US10Y? = risk-off ? ters normalize
     stress_changes  = [dxy_c, vix_c, us10y_c]
     stress_weights  = [0.25, 0.30, 0.20]
     stress_score_raw = _weighted_change_score(stress_changes, stress_weights)
     # Ters evir: yüksek stres = d?k risk-on skoru
     stress_score = 100.0 - stress_score_raw
 
-    # Emtia (OIL? + GOLD? birlikte ? risk-off, ayr? ayr? karma sinyal)
+    # Emtia (OIL? + GOLD? birlikte ? risk-off, ayrı ayrı karma sinyal)
     commodity_score = 50.0
     if oil_c is not None and gold_c is not None:
         if oil_c > 0 and gold_c > 0:
-            commodity_score = 35.0  # her ikisi yukar? ? risk-off ağırl?kl?
+            commodity_score = 35.0  # her ikisi yukarı ? risk-off ağırlıklı
         elif oil_c > 0 and gold_c < 0:
             commodity_score = 55.0
         elif oil_c < 0 and gold_c < 0:
-            commodity_score = 65.0  # her ikisi aşağı ? risk-on ağırl?kl?
+            commodity_score = 65.0  # her ikisi aşağı ? risk-on ağırlıklı
         else:
             commodity_score = 50.0
 
@@ -1510,20 +1510,20 @@ def _build_macro_stress_block(data: dict) -> dict:
 def build_risk_on_off(data: dict) -> dict:
     """
     Global Risk On/Off gstergesi.
-    Tüm bölgelerin ağırl?kl? kompozit skoru.
+    Tüm bölgelerin ağırlıklı kompozit skoru.
     
     Döner:
       global_score   — 0-100 composite
       global_signal  — RISK ON / NEUTRAL / RISK OFF
       strict_score   — sadece yüksek gven bölgelerinden
       live_score     — tüm mevcut veriden
-      sync_q         — bölgeler aras? uyum skoru (0-100)
-      agree_q        — tüm varl?klar iinde pozitif % (0-100)
+      sync_q         — bölgeler arası uyum skoru (0-100)
+      agree_q        — tüm varlıklar iinde pozitif % (0-100)
       regions        — 4 bölgesel blok
-      macro_stress   — makro stres katman?
+      macro_stress   — makro stres katmanı
       drivers        — en g—l 2 src
       drags          — en g—l 2 frenleme
-      coverage       — kaç/toplam varl?k verisi geldi
+      coverage       — kaç/toplam varlık verisi geldi
     """
     # ?? Bölgeler ??????????????????????????????????????????????????????????????
     asia = _build_region("ASIA", [
@@ -1542,10 +1542,10 @@ def build_risk_on_off(data: dict) -> dict:
         ("NASDAQ", "NASDAQ_C", 0.50),
     ], data, region_weight=0.18)
 
-    # BTC ve ETH de?i?imleri
+    # BTC ve ETH değişimleri
     btc_c = _pct(data.get("BTC_C"))
     eth_c_raw = data.get("ETH_C")
-    # ETH de?i?imi: ETH_P yoksa BTC ile birlikte gelmeyebilir, BTC_C proxy kullan
+    # ETH değişimi: ETH_P yoksa BTC ile birlikte gelmeyebilir, BTC_C proxy kullan
     eth_c = _pct(eth_c_raw) if eth_c_raw and eth_c_raw != "-" else (btc_c * 0.9 if btc_c else None)
 
     crypto = _build_region("CRYPTO", [
@@ -1573,7 +1573,7 @@ def build_risk_on_off(data: dict) -> dict:
     else:
         strict_score = global_score
 
-    # ?? Sync Q: bölgeler aras? uyum ??????????????????????????????????????????
+    # ?? Sync Q: bölgeler arası uyum ??????????????????????????????????????????
     # Bölge sinyalleri ne kadar birbirine benziyor?
     signals = [r["signal"] for r in regions]
     risk_on_count  = signals.count("RISK ON")
@@ -1582,7 +1582,7 @@ def build_risk_on_off(data: dict) -> dict:
     dominant       = max(risk_on_count, risk_off_count, neutral_count)
     sync_q         = clamp_score(dominant / len(signals) * 100)
 
-    # ?? Agree Q: tüm varl?klarda pozitif % ???????????????????????????????????
+    # ?? Agree Q: tüm varlıklarda pozitif % ???????????????????????????????????
     all_assets = []
     for r in regions:
         all_assets.extend(r["assets"])
