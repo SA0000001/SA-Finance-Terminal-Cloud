@@ -21,7 +21,7 @@ DEFAULT_DEPTH = "Orta"
 TELEGRAM_MESSAGE_LIMIT = 2800
 ISTANBUL_TZ = ZoneInfo("Europe/Istanbul")
 
-# Rapor arşivi dizini
+# Rapor ar?ivi dizini
 REPORTS_DIR = Path("reports")
 ARCHIVE_DIR = REPORTS_DIR / "archive"
 
@@ -118,15 +118,15 @@ def generate_bulletin_report(client, context: dict, config: RuntimeConfig) -> tu
         return normalize_report_payload(None, context), True
 
 
-# ─── JSON KAYIT / ARŞIV ──────────────────────────────────────────────────────
+# ??? JSON KAYIT / AR?IV ??????????????????????????????????????????????????????
 
 def save_report_to_disk(report: dict, context: dict, config: RuntimeConfig, now: datetime) -> None:
     """
     Raporu iki yere kaydeder:
-      reports/latest_2245.json  ← her zaman güncel
-      reports/archive/2025-04-09_2245.json  ← kalıcı arşiv
+      reports/latest_2245.json  ? her zaman g�ncel
+      reports/archive/2025-04-09_2245.json  ? kal?c? ar?iv
     
-    Arşivde sadece 22:45 bültenleri saklanır (1630 latest olarak tutulur ama arşive yazılmaz).
+    Ar?ivde sadece 22:45 b�ltenleri saklan?r (1630 latest olarak tutulur ama ar?ive yaz?lmaz).
     """
     REPORTS_DIR.mkdir(exist_ok=True)
     ARCHIVE_DIR.mkdir(exist_ok=True)
@@ -162,12 +162,12 @@ def save_report_to_disk(report: dict, context: dict, config: RuntimeConfig, now:
         "fallback_used": report.get("fallback_used", False),
     }
 
-    # Her zaman latest dosyasını güncelle
+    # Her zaman latest dosyas?n? g�ncelle
     latest_path = REPORTS_DIR / f"latest_{config.slot}.json"
     latest_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"Latest rapor kaydedildi: {latest_path}")
 
-    # Sadece 22:45 bülteni arşive yazılır
+    # Sadece 22:45 b�lteni ar?ive yaz?l?r
     if config.slot == "2245":
         archive_path = ARCHIVE_DIR / f"{now.strftime('%Y-%m-%d')}_2245.json"
         archive_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -175,7 +175,7 @@ def save_report_to_disk(report: dict, context: dict, config: RuntimeConfig, now:
 
 
 def load_latest_report(slot: str) -> dict | None:
-    """Terminal tarafından kullanılır — en güncel raporu okur."""
+    """Terminal taraf?ndan kullan?l?r � en g�ncel raporu okur."""
     path = REPORTS_DIR / f"latest_{slot}.json"
     if not path.exists():
         return None
@@ -186,7 +186,7 @@ def load_latest_report(slot: str) -> dict | None:
 
 
 def list_archive_reports() -> list[dict]:
-    """Arşivdeki tüm 22:45 raporlarını tarih azalan sırada döner."""
+    """Ar?ivdeki t�m 22:45 raporlar?n? tarih azalan s?rada d�ner."""
     if not ARCHIVE_DIR.exists():
         return []
     files = sorted(ARCHIVE_DIR.glob("*_2245.json"), reverse=True)
@@ -207,7 +207,7 @@ def list_archive_reports() -> list[dict]:
     return reports
 
 
-# ─── TELEGRAM ────────────────────────────────────────────────────────────────
+# ??? TELEGRAM ????????????????????????????????????????????????????????????????
 
 def build_telegram_summary(context: dict, config: RuntimeConfig, fallback_used: bool = False, now: datetime | None = None) -> str:
     now    = now or datetime.now(ISTANBUL_TZ)
@@ -327,7 +327,7 @@ def send_daily_bulletin(token: str, chat_id: str, summary_text: str, terminal_re
         raise
 
 
-# ─── MAIN ────────────────────────────────────────────────────────────────────
+# ??? MAIN ????????????????????????????????????????????????????????????????????
 
 def main():
     config = load_runtime_config()
