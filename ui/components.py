@@ -1,6 +1,6 @@
 """
-SA Finance Alpha Terminal � Component System
-Reusable, typed render functions.  No CSS here � CSS lives in ui/theme.py.
+SA Finance Alpha Terminal - Component System
+Reusable, typed render functions.  No CSS here - CSS lives in ui/theme.py.
 """
 import html as _html
 
