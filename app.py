@@ -1216,10 +1216,10 @@ def render_risk_on_off_panel(analytics: dict) -> None:
         )
         + "<div style='padding:14px;border-radius:var(--r-md);border:1px solid var(--border);background:rgba(255,255,255,0.022)'>"
         "<div style='display:grid;grid-template-columns:1fr 1fr;gap:12px'>"
-        "<div><div style='font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--positive);margin-bottom:8px'>? DRIVERS  LIVE NOW</div>"
+        "<div><div style='font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--positive);margin-bottom:8px'> DRIVERS  LIVE NOW</div>"
         + (drivers_html if drivers_html else "<div style='font-size:0.78rem;color:var(--text-muted)'>Veri bekleniyor</div>")
         + "</div>"
-        "<div><div style='font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--negative);margin-bottom:8px'>? DRAGS</div>"
+        "<div><div style='font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--negative);margin-bottom:8px'> DRAGS</div>"
         + (drags_html if drags_html else "<div style='font-size:0.78rem;color:var(--text-muted)'>Veri bekleniyor</div>")
         + "</div></div>"
         + "<div style='margin-top:10px;padding:10px 12px;border-radius:var(--r-sm);border:1px solid " + tx_color.replace('var(--', 'rgba(').replace(')', ',0.25)') + ";background:rgba(255,255,255,0.018)'>"
