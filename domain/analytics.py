@@ -1300,8 +1300,8 @@ def _build_verdict(mqs: dict, ews: dict, scores: dict) -> dict:
         verdict = "DİKKAT"
         verdict_en = "SELECTIVE"
         color = "warning"
-        summary = "Karma sinyal. Sadece en yüksek kaliteli setup'larda, k—k boyutle işlem yap?labilir."
-        size_guidance = "K—k boyut / seçici"
+        summary = "Karma sinyal. Sadece en yüksek kaliteli setup'larda, küçük boyutle işlem yapılabilir."
+        size_guidance = "Küçük boyut / seçici"
         action = "Yalnızca en güçlü teyitlerde, küçük boyutla işlem. Agresif pozisyon alma."
     
     # Hangi koşul kararı belirliyor?
