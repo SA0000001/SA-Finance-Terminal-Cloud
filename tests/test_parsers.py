@@ -86,6 +86,6 @@ def test_parse_latest_etf_flow_row_remains_compatible_with_legacy_layout():
     mapping = dict(zip(ETF_FLOW_COLUMNS, values))
 
     assert date_text == "08 Apr 2026"
-    assert mapping["MSBT"] == "â€”"
+    assert mapping["MSBT"] == "—"
     assert mapping["GBTC"] == "(11.1)"
     assert mapping["TOTAL"] == "(93.9)"

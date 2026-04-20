@@ -154,7 +154,7 @@ def test_strategy_report_prompt_includes_new_sections_and_tags():
     assert "<x_thread>" in prompt
     assert "Ekonomik takvim" in prompt
     assert "Veri sagligi" in prompt
-    assert "SA Finance Alpha Makro Bulteni Giris" in prompt
+    assert "SA Finance Alpha Makro Bülteni Giriş" in prompt
     assert "Long / Short / Bekle ve Kritik Riskler" in prompt
     assert "1/5 ..." in prompt
     assert "Fragile confidence" in prompt
@@ -209,7 +209,7 @@ def test_parse_report_payload_falls_back_when_content_is_not_tagged_string():
 
     parsed = _parse_report_payload(raw, data, brief, analytics)
 
-    assert "### SA Finance Alpha Makro Bulteni Giris" in parsed["terminal_report"]
+    assert "### SA Finance Alpha Makro Bülteni Giriş" in parsed["terminal_report"]
     assert "Makro Ortam ve Risk Istahi" in parsed["terminal_report"]
     assert "SP500" in parsed["terminal_report"]
     assert "ETF, Stablecoin ve Altcoinler" in parsed["terminal_report"]
