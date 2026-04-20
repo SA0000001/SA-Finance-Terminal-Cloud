@@ -19,7 +19,13 @@ def parse_number(value):
         else:
             cleaned = cleaned.replace(",", "")
     elif cleaned.count(",") == 1 and cleaned.count(".") == 0:
-        cleaned = cleaned.replace(",", ".")
+        parts = cleaned.split(",")
+        if len(parts[1]) == 3:
+            # "23,450" veya "1,234" — binlik ayırıcı
+            cleaned = cleaned.replace(",", "")
+        else:
+            # "7,25" — Türkçe ondalık ayırıcı
+            cleaned = cleaned.replace(",", ".")
     else:
         cleaned = cleaned.replace(",", "")
 

@@ -41,7 +41,7 @@ METRIC_CONTEXT: dict[str, str] = {
     "VIX":             "Normal: <20 · Endişe: 20–30 · Korku: 30–40 · Panik: >40",
     "ETF_FLOW_TOTAL":  "Güçlü Giriş: >500M · Giriş: >0 · Çıkış: <0 · Güçlü Çıkış: <-200M",
     "USDT_D":          "Düşük (risk-on): <4% · Nötr: 4–6% · Yüksek (risk-off): >6%",
-    "STABLE_C_D":      "Pozitif: piyasaya stablecoin giriyor · Negatif: stablecoin çekiliyor",
+    "STABLE_C_D":      "Stablecoin dominansı (toplam piyasanın %). Yüksek değer = savunmacı ortam / risk-off",
     "OI":              "Yükselen OI + yükselen fiyat: sağlıklı. Yükselen OI + düşen fiyat: dikkat.",
     "DXY":             "Güçlü DXY genellikle kripto için baskıcı. Zayıf DXY risk-on ortamı destekler.",
     "US10Y":           "Hızlı yükseliş likiditeyi sıkar. >4.5% seviyeleri risk varlıkları için baskı.",
@@ -398,11 +398,17 @@ def _build_positioning_factor(data: dict) -> dict:
     btc_change = parse_number(data.get("BTC_C"))
     etf_flow = parse_number(data.get("ETF_FLOW_TOTAL"))
 
-    divergence_score = 80
-    if (btc_change or 0) > 0 and (etf_flow or 0) < 0:
-        divergence_score = 28
-    elif (btc_change or 0) < 0 and (etf_flow or 0) > 0:
-        divergence_score = 62
+    divergence_score = 62  # default: nötr-pozitif
+    if etf_flow is None:
+        divergence_score = 50  # veri yok, nötr
+    elif (btc_change or 0) > 0 and etf_flow > 0:
+        divergence_score = 80  # BTC yukarı + ETF girişi: güçlü bullish uyum
+    elif (btc_change or 0) > 0 and etf_flow < 0:
+        divergence_score = 28  # BTC yukarı + ETF çıkışı: divergence (dikkat)
+    elif (btc_change or 0) < 0 and etf_flow > 0:
+        divergence_score = 62  # BTC aşağı + ETF girişi: dip alımı olabilir
+    elif (btc_change or 0) < 0 and etf_flow < 0:
+        divergence_score = 22  # BTC aşağı + ETF çıkışı: bearish uyum
 
     metrics = [
         {
@@ -426,7 +432,7 @@ def _build_positioning_factor(data: dict) -> dict:
         {
             "label": "Open interest",
             "display": _display(data.get("OI")),
-            "score": _linear_score(open_interest, 1_800_000, 3_800_000, inverse=True),
+            "score": _linear_score(open_interest, 150_000, 600_000, inverse=True),
             "weight": 0.16,
         },
         {
@@ -1160,12 +1166,20 @@ def _build_ews(data: dict, scores: dict) -> dict:
     ob_score = 55  # varsayılan nötr
     if isinstance(ob_signal, str):
         sig_lower = ob_signal.lower()
-        if any(w in sig_lower for w in ["strong buy", "buy", "support"]):
+        if any(w in sig_lower for w in ["strong buy", "buy", "support", "destek", "alim", "güçlü destek", "guclu destek"]):
             ob_score = 78
-        elif any(w in sig_lower for w in ["strong sell", "sell", "resistance"]):
+        elif any(w in sig_lower for w in ["strong sell", "sell", "resistance", "direnç", "direnc", "satim", "baskı", "baski"]):
             ob_score = 28
-        elif any(w in sig_lower for w in ["neutral", "mixed"]):
+        elif any(w in sig_lower for w in ["neutral", "mixed", "nötr", "notr", "karma"]):
             ob_score = 52
+        # ORDERBOOK_SIGNAL_CLASS / BADGE fallback
+        ob_badge = data.get("ORDERBOOK_SIGNAL_BADGE", "")
+        ob_class = data.get("ORDERBOOK_SIGNAL_CLASS", "")
+        if ob_score == 55:  # hâlâ nötr ise badge/class'a bak
+            if "SUPPORT" in str(ob_badge).upper() or "signal-long" in str(ob_class):
+                ob_score = 78
+            elif "RESISTANCE" in str(ob_badge).upper() or "signal-short" in str(ob_class):
+                ob_score = 28
 
     # Momentum kalitesi — fiyat hareketi + taker uyumu
     btc_change = parse_number(data.get("BTC_C")) or 0.0
@@ -1224,6 +1238,15 @@ def _build_ews(data: dict, scores: dict) -> dict:
     sup = data.get("Sup_Wall", "-")
     res = data.get("Res_Wall", "-")
     
+    # Bias: orderbook sinyali + momentum yönünden türet
+    btc_change_val = parse_number(data.get("BTC_C")) or 0.0
+    if ob_score >= 70 and btc_change_val > 0:
+        ews_bias = "LONG"
+    elif ob_score <= 35 and btc_change_val < 0:
+        ews_bias = "SHORT"
+    else:
+        ews_bias = "NEUTRAL"
+
     return {
         "score":      ews,
         "label":      label,
@@ -1234,6 +1257,7 @@ def _build_ews(data: dict, scores: dict) -> dict:
         "support":    sup,
         "resistance": res,
         "ob_signal":  ob_signal or "-",
+        "bias":       ews_bias,
     }
 
 
@@ -1241,9 +1265,9 @@ def _build_verdict(mqs: dict, ews: dict, scores: dict) -> dict:
     """
     EVET / DİKKAT / HAYIR kararını retir.
     
-    EVET:    MQS ? 60 VE EWS ? 58 VE fragility < 65
+    EVET:    MQS >= 60 VE EWS >= 58 VE fragility < 58 VE overall >= 55
     DİKKAT: Yukarıdakilerin bazıları sağlanıyor ama hepsi değil
-    HAYIR:   MQS < 45 VEYA EWS < 40 VEYA fragility ? 70
+    HAYIR:   MQS < 45 VEYA EWS < 34 VEYA fragility >= 72 VEYA overall < 30
     """
     mqs_s  = mqs["score"]
     ews_s  = ews["score"]
@@ -1252,7 +1276,7 @@ def _build_verdict(mqs: dict, ews: dict, scores: dict) -> dict:
     
     # HAYIR koşulları
     hard_no = (
-        mqs_s < 36 or
+        mqs_s < 45 or
         ews_s < 34 or
         frag_s >= 72 or
         overall < 30
@@ -1269,22 +1293,13 @@ def _build_verdict(mqs: dict, ews: dict, scores: dict) -> dict:
     # DİKKAT koşulları — ikisi arasında kalan alan
     # hard_no değil ve strong_yes değilse otomatik DİKKAT devreye girer
     # Ek kontrol: en az biri 45+ olmalı
-    at_least_one_ok = mqs_s >= 45 or ews_s >= 45
-    
-    if hard_no and not at_least_one_ok:
+    if hard_no:
         verdict = "HAYIR"
         verdict_en = "NO TRADE"
         color = "negative"
-        summary = "Piyasa ortamı veya işlem penceresi yeni pozisyon iin elverişli değil. Kenarda dur, teyit bekle."
+        summary = "Piyasa ortamı veya işlem penceresi yeni pozisyon için elverişli değil. Kenarda dur, teyit bekle."
         size_guidance = "0%"
-        action = "Kenarda kal. Mevcut pozisyonları koru, yeni ama."
-    elif hard_no:
-        verdict = "DİKKAT"
-        verdict_en = "SELECTIVE"
-        color = "warning"
-        summary = "Koşullar zayıf. Mevcut açık pozisyonları koru, yeni pozisyon açmaktan kaçın."
-        size_guidance = "0% — yeni pozisyon yok"
-        action = "Yeni pozisyon açma. Mevcut pozisyonlarda stop'ları sıkılaştır."
+        action = "Kenarda kal. Mevcut pozisyonları koru, yeni açma."
     elif strong_yes:
         verdict = "EVET"
         verdict_en = "GO"
@@ -1370,6 +1385,109 @@ def build_decision_verdict(data: dict, scores: dict) -> dict:
 # Agree Q:   tüm varlıklar iinde pozitif olanların oranı
 #
 
+def _confidence_tier(score: float) -> str:
+    if score >= 75:
+        return "HIGH"
+    if score >= 55:
+        return "MEDIUM"
+    return "LOW"
+
+
+def _phase_from_score(score: float) -> str:
+    if score >= 62:
+        return "BULL PHASE"
+    if score <= 38:
+        return "BEAR PHASE"
+    return "NEUTRAL PHASE"
+
+
+def _side_bias_from_state(global_score: float, transmission_score: float) -> str:
+    if global_score >= 58 and transmission_score >= 52:
+        return "LONG"
+    if global_score <= 42 and transmission_score <= 48:
+        return "SHORT"
+    return "NEUTRAL"
+
+
+def _playbook_for_side(side_bias: str) -> str:
+    if side_bias == "LONG":
+        return "long bias · 25% max size · breakout entry, no chasing"
+    if side_bias == "SHORT":
+        return "short bias · 25% max size · breakdown entry, no chasing"
+    return "neutral bias · 15% max size · selective mean-reversion only"
+
+
+def _build_risk_decomposition(
+    *,
+    strict_score: float,
+    live_score: float,
+    market_core_score: float,
+    stress_score: float,
+    transmission_score: float,
+    sync_q: float,
+    agree_q: float,
+    coverage_ratio: float,
+) -> dict:
+    def _delta(score_like: float) -> float:
+        return round((score_like - 50.0) / 10.0, 2)
+
+    strict_prelim = (sync_q * 0.50) + (agree_q * 0.50)
+    live_prelim = (sync_q * 0.45) + (agree_q * 0.35) + ((coverage_ratio * 100.0) * 0.20)
+
+    return {
+        "strict": {
+            "mkt": _delta(market_core_score),
+            "stress": _delta(stress_score),
+            "btc_tx": _delta(transmission_score),
+            "prelim_factor": _delta(strict_prelim),
+            "total": _delta(strict_score),
+        },
+        "live": {
+            "mkt": _delta(market_core_score),
+            "stress": _delta(stress_score),
+            "btc_tx": _delta(transmission_score),
+            "prelim_factor": _delta(live_prelim),
+            "total": _delta(live_score),
+        },
+    }
+
+
+def _build_ai_analysis(
+    *,
+    global_signal: str,
+    side_bias: str,
+    confidence_tier: str,
+    playbook: str,
+    drivers: list,
+    drags: list,
+) -> dict:
+    top_driver = drivers[0] if drivers else None
+    top_drag = drags[0] if drags else None
+    top_driver_text = f"{top_driver['label']} ({top_driver.get('impact', 0):+0.2f})" if top_driver else "N/A"
+    top_drag_text = f"{top_drag['label']} ({top_drag.get('impact', 0):+0.2f})" if top_drag else "N/A"
+
+    if global_signal == "RISK ON":
+        implication = "Risk-on confirms; keep entries selective and protect against late chase."
+    elif global_signal == "RISK OFF":
+        implication = "Risk-off pressure is dominant; defensive sizing remains preferable."
+    else:
+        implication = "Mixed tape; prioritize confirmed setups and smaller tactical size."
+
+    text = (
+        f"Top driver: {top_driver_text}. "
+        f"Top drag: {top_drag_text}. "
+        f"Implication: {implication} "
+        f"Playbook: {playbook} | Side: {side_bias} | Confidence: {confidence_tier}."
+    )
+
+    return {
+        "top_driver": top_driver_text,
+        "top_drag": top_drag_text,
+        "implication": implication,
+        "text": text,
+    }
+
+
 def _pct(value) -> float | None:
     """'%1.23' veya '1.23%' veya '1.23' ? float veya None"""
     v = parse_number(value)
@@ -1377,18 +1495,19 @@ def _pct(value) -> float | None:
 
 
 def _weighted_change_score(changes: list[float | None], weights: list[float]) -> float:
-    """Ağırlıklı değişim ortalaması ? normalize edilmiş 0-100 skor"""
-    total_w = 0.0
+    """Ağırlıklı değişim ortalaması → normalize edilmiş 0-100 skor.
+    Eksik veri nötr (50) olarak katkı sağlar — bu sayede eksik asset skoru 50'ye çeker."""
+    total_w = sum(weights)
+    if total_w == 0:
+        return 50.0
     total_s = 0.0
     for c, w in zip(changes, weights):
         if c is None:
-            continue
-        # +/-5% aralığını 0-100'e normalize et
-        normalized = max(0.0, min(100.0, (c + 5.0) / 10.0 * 100.0))
-        total_s += normalized * w
-        total_w += w
-    if total_w == 0:
-        return 50.0
+            total_s += 50.0 * w  # eksik veri → nötr katkısı
+        else:
+            # +/-5% aralığını 0-100'e normalize et
+            normalized = max(0.0, min(100.0, (c + 5.0) / 10.0 * 100.0))
+            total_s += normalized * w
     return total_s / total_w
 
 
@@ -1545,13 +1664,19 @@ def build_risk_on_off(data: dict) -> dict:
     # BTC ve ETH değişimleri
     btc_c = _pct(data.get("BTC_C"))
     eth_c_raw = data.get("ETH_C")
-    # ETH değişimi: ETH_P yoksa BTC ile birlikte gelmeyebilir, BTC_C proxy kullan
-    eth_c = _pct(eth_c_raw) if eth_c_raw and eth_c_raw != "-" else (btc_c * 0.9 if btc_c else None)
+    eth_c_real = _pct(eth_c_raw) if eth_c_raw and eth_c_raw not in ("", "-", None) else None
+    # ETH yoksa BTC proxy ile bölge coverage'ını koru (BULGU-08: sadece region için, transmission için değil)
+    eth_c_for_region = eth_c_real if eth_c_real is not None else (btc_c * 0.9 if btc_c is not None else None)
+
+    # CRYPTO region için ETH proxy'yi data'ya enjekte et (orijinal data'yı bozmadan)
+    crypto_data = dict(data)
+    if eth_c_for_region is not None and eth_c_real is None:
+        crypto_data["ETH_C"] = str(eth_c_for_region)
 
     crypto = _build_region("CRYPTO", [
         ("BTC", "BTC_C",  0.55),
         ("ETH", "ETH_C",  0.45),
-    ], data, region_weight=0.18)
+    ], crypto_data, region_weight=0.18)
 
     macro_stress = _build_macro_stress_block(data)
 
@@ -1623,11 +1748,10 @@ def build_risk_on_off(data: dict) -> dict:
         risk_delta = a["value"] * risk_sign
         scored_assets_raw.append({"label": a["label"], "change": a["change"], "risk_delta": risk_delta})
 
-    # Cross-asset ratio sinyallerini ekle: ETH/BTC, BTC/NQ, BTC/GOLD
+    # Cross-asset ratio sinyallerini ekle: BTC/NQ, BTC/GOLD (ETH/BTC sadece gerçek ETH verisiyle)
     btc_c_d  = _pct(data.get("BTC_C"))
-    eth_c_d  = _pct(data.get("ETH_C"))
-    if eth_c_d is None and btc_c_d is not None:
-        eth_c_d = btc_c_d * 0.9
+    eth_c_d_raw = data.get("ETH_C")
+    eth_c_d  = _pct(eth_c_d_raw) if eth_c_d_raw and eth_c_d_raw not in ("", "-", None) else None  # proxy yok
     nq_c_d   = _pct(data.get("NASDAQ_C"))
     gold_c_d = _pct(data.get("GOLD_C"))
     _scale = 3.0
@@ -1658,7 +1782,8 @@ def build_risk_on_off(data: dict) -> dict:
         return {"pair": pair, "spread": round(spread,2), "display": f"{spread:+.2f}", "score": score, "signal": signal, "contribution": round((score-50)/10,2)}
     btc_cx = _pct(data.get("BTC_C"))
     eth_raw_cx = data.get("ETH_C")
-    eth_cx = _pct(eth_raw_cx) if eth_raw_cx and eth_raw_cx != "-" else (btc_cx * 0.9 if btc_cx else None)
+    # BULGU-08: ETH yokken proxy kullanma, ETH/BTC pair'i tamamen atla
+    eth_cx = _pct(eth_raw_cx) if eth_raw_cx and eth_raw_cx not in ("", "-", None) else None
     nq_cx  = _pct(data.get("NASDAQ_C"))
     gold_cx = _pct(data.get("GOLD_C"))
     tx_items = [x for x in [
@@ -1670,25 +1795,61 @@ def build_risk_on_off(data: dict) -> dict:
     tx_signal = "RISK ON" if tx_score >= 56 else "RISK OFF" if tx_score <= 44 else "NEUTRAL"
     cross_asset_transmission = {"score": tx_score, "signal": tx_signal, "items": tx_items}
 
+    # BULGU-02: eksik alanları hesapla (phase, side_bias, playbook, confidence_tier, decomposition, ai_analysis)
+    region_weight_sum = sum(r["weight"] for r in regions) or 1.0
+    market_core_score = clamp_score(sum(r["score"] * r["weight"] for r in regions) / region_weight_sum)
+    transmission_score = tx_score
+    phase = _phase_from_score(global_score)
+    side_bias = _side_bias_from_state(global_score, transmission_score)
+    playbook = _playbook_for_side(side_bias)
+    total_assets_count = len(all_assets)
+    coverage_ratio = (total_assets / total_assets_count) if total_assets_count else 0.0
+    confidence_score = clamp_score((sync_q * 0.35) + (agree_q * 0.35) + ((coverage_ratio * 100) * 0.30))
+    confidence_tier_val = _confidence_tier(confidence_score)
+    decomposition = _build_risk_decomposition(
+        strict_score=strict_score,
+        live_score=global_score,
+        market_core_score=market_core_score,
+        stress_score=macro_stress["score"],
+        transmission_score=transmission_score,
+        sync_q=sync_q,
+        agree_q=agree_q,
+        coverage_ratio=coverage_ratio,
+    )
+    ai_analysis = _build_ai_analysis(
+        global_signal=global_signal,
+        side_bias=side_bias,
+        confidence_tier=confidence_tier_val,
+        playbook=playbook,
+        drivers=drivers,
+        drags=drags,
+    )
+
     coverage = f"{total_assets}/{len(all_assets)}"
 
     return {
-        "global_score":  global_score,
-        "global_signal": global_signal,
-        "global_color":  global_color,
-        "strict_score":  strict_score,
-        "strict_signal": strict_signal,
-        "strict_color":  strict_color,
-        "live_score":    global_score,
-        "sync_q":        sync_q,
-        "agree_q":       agree_q,
-        "regions":       regions,
-        "macro_stress":  macro_stress,
-        "drivers":       drivers,
-        "drags":         drags,
-        "coverage":      coverage,
+        "global_score":   global_score,
+        "global_signal":  global_signal,
+        "global_color":   global_color,
+        "strict_score":   strict_score,
+        "strict_signal":  strict_signal,
+        "strict_color":   strict_color,
+        "live_score":     global_score,
+        "sync_q":         sync_q,
+        "agree_q":        agree_q,
+        "regions":        regions,
+        "macro_stress":   macro_stress,
+        "drivers":        drivers,
+        "drags":          drags,
+        "coverage":       coverage,
         "risk_on_count":  risk_on_count,
         "neutral_count":  neutral_count,
         "risk_off_count": risk_off_count,
+        "phase":          phase,
+        "side_bias":      side_bias,
+        "playbook":       playbook,
+        "confidence_tier": confidence_tier_val,
+        "decomposition":  decomposition,
         "cross_asset_transmission": cross_asset_transmission,
+        "ai_analysis":    ai_analysis,
     }
