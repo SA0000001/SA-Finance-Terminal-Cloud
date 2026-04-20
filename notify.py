@@ -209,15 +209,15 @@ def list_archive_reports() -> list[dict]:
 
 # ??? TELEGRAM ????????????????????????????????????????????????????????????????
 
-def build_telegram_summary(context: dict, config: RuntimeConfig, fallback_used: bool = False, now: datetime | None = None) -> str:
+def build_telegram_summary(context: dict, config: RuntimeConfig | None = None, fallback_used: bool = False, now: datetime | None = None) -> str:
     now    = now or datetime.now(ISTANBUL_TZ)
     data   = context["data"]
     scores = context["analytics"].get("scores", {})
-    slot_label = "16:30" if config.slot == "1630" else "22:45"
+    slot_label = ("16:30" if config.slot == "1630" else "22:45") if config else "22:45"
     invalidate = " | ".join(scores.get("invalidate_conditions", [])[:1]) or _safe(scores.get("weakest_driver"))
 
     lines = [
-        f"*SA Finance Alpha | Makro Bulten {slot_label}*",
+        f"*SA Finance Alpha | Gunluk Makro Bulten {slot_label}*",
         now.strftime("%d.%m.%Y %H:%M TRT"),
         f"Rejim: {_safe(scores.get('overlay'))} ({_safe(scores.get('overall'))}/100)",
         f"BTC: {_safe(data.get('BTC_P'))} | 24s {_safe(data.get('BTC_C'))}",
