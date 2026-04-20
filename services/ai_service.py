@@ -163,7 +163,7 @@ def _fallback_terminal_report(data: dict, brief: dict, analytics: dict) -> str:
     breadth_ratio_summary = _breadth_ratio_summary(data)
     return "\n".join(
         [
-            "### SA Finance Alpha Makro Bulteni Giris",
+            "### SA Finance Alpha Makro Bülteni Giriş",
             f"Gunun ana cercevesinde BTC {_safe(data.get('BTC_P'))} seviyesinde islem gorurken, piyasa resmi tek bir etikete indirgenmek yerine likidite, oynaklik ve katilim uzerinden okunmali. Bu not, makro ortam ile kripto internallerini ayni karar akisinda birlestirir.",
             "",
             "### Gunluk Harita ve Ana Cikarim",
