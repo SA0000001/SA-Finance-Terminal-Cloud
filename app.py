@@ -65,7 +65,7 @@ st.markdown(TERMINAL_CSS, unsafe_allow_html=True)
 MACRO_MARKET_SECTIONS = [
     {"title": "US Endeksleri",      "kicker": "Americas",      "caption": "", "rows": [("S&P 500","SP500"),("NASDAQ","NASDAQ"),("Dow Jones","DOW")]},
     {"title": "Avrupa Endeksleri",  "kicker": "Europe",        "caption": "", "rows": [("DAX","DAX"),("FTSE 100","FTSE"),("BIST 100","BIST100")]},
-    {"title": "Asya Endeksleri",    "kicker": "Asia / Vol",    "caption": "", "rows": [("Nikkei 225","NIKKEI"),("Hang Seng","HSI"),("CSI 300","CSI300"),("VIX","VIX")]},
+    {"title": "Asya Endeksleri",    "kicker": "Asia / Vol",    "caption": "", "rows": [("Nikkei 225","NIKKEI"),("Hang Seng","HSI"),("Shanghai Comp","SHCOMP"),("VIX","VIX")]},
     {"title": "Metaller",           "kicker": "Commodities",   "caption": "", "rows": [("Altın / oz","GOLD"),("Gümüş / oz","SILVER"),("Bakır","COPPER")]},
     {"title": "Enerji & Tarım",     "kicker": "Energy & Agri", "caption": "", "rows": [("Ham Petrol WTI","OIL"),("Doğalgaz","NATGAS"),("Buğday","WHEAT")]},
     {"title": "Majors FX",          "kicker": "FX Majors",     "caption": "", "rows": [("EUR/USD","EURUSD"),("GBP/USD","GBPUSD"),("USD/JPY","USDJPY")]},
@@ -88,7 +88,7 @@ DATA_ATLAS_SECTIONS = [
     {"title": "Crypto Participation", "rows": [("TOTAL","TOTAL_CAP"),("TOTAL2","TOTAL2_CAP"),("TOTAL3","TOTAL3_CAP"),("OTHERS","OTHERS_CAP"),("BTC Dom","Dom"),("ETH Dom","ETH_Dom")]},
     {"title": "Stablecoin & On-Chain","rows": [("Toplam Stable","Total_Stable"),("USDT","USDT_MCap"),("USDC","USDC_MCap"),("DAI","DAI_MCap"),("Stable.C.D","STABLE_C_D"),("USDT.D","USDT_D"),("USDT Dom Stable","USDT_Dom_Stable"),("Hashrate","Hash"),("Aktif Adres","Active")]},
     {"title": "Policy & Liquidity",   "rows": [("FED Faizi","FED"),("M2 YoY","M2"),("ABD 10Y","US10Y"),("DXY","DXY"),("VIX","VIX"),("BTC↔SP500","Corr_SP500"),("BTC↔Altın","Corr_Gold")]},
-    {"title": "Endeksler & Emtia",    "rows": [("S&P 500","SP500"),("NASDAQ","NASDAQ"),("DAX","DAX"),("NIKKEI","NIKKEI"),("CSI300","CSI300"),("BIST100","BIST100"),("Altın","GOLD"),("Gümüş","SILVER"),("Petrol","OIL"),("Doğalgaz","NATGAS"),("Bakır","COPPER")]},
+    {"title": "Endeksler & Emtia",    "rows": [("S&P 500","SP500"),("NASDAQ","NASDAQ"),("DAX","DAX"),("NIKKEI","NIKKEI"),("Shanghai Comp","SHCOMP"),("BIST100","BIST100"),("Altın","GOLD"),("Gümüş","SILVER"),("Petrol","OIL"),("Doğalgaz","NATGAS"),("Bakır","COPPER")]},
     {"title": "Macro ETF Breadth",    "rows": [("SPY","SPY_C"),("RSP","RSP_C"),("QQQ","QQQ_C"),("IWM","IWM_C"),("XLK","XLK_C"),("XLF","XLF_C"),("XLI","XLI_C"),("XLE","XLE_C"),("XLY","XLY_C")]},
     {"title": "Forex",                "rows": [("EUR/USD","EURUSD"),("GBP/USD","GBPUSD"),("USD/JPY","USDJPY"),("USD/TRY","USDTRY"),("USD/CHF","USDCHF"),("AUD/USD","AUDUSD")]},
 ]
