@@ -1648,7 +1648,7 @@ def build_risk_on_off(data: dict) -> dict:
     asia = _build_region("ASIA", [
         ("N225",  "NIKKEI_C", 0.40),
         ("HSI",   "HSI_C",    0.35),
-        ("SHCOMP","CSI300_C", 0.25),
+        ("SHCOMP", "SHCOMP_C", 0.25),
     ], data, region_weight=0.18)
 
     europe = _build_region("EUROPE", [
