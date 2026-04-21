@@ -118,7 +118,9 @@ def _record_parse_error(
 
 def _history_with_latency(symbol: str, *, period: str):
     started_at = time.perf_counter()
-    history = yf.Ticker(symbol).history(period=period)
+    # auto_adjust=True: vadeli işlem kontrat rollover'larında fiyat sürekliliği sağlar
+    # back_adjust=False: geriye dönük düzeltme kapatılıyor (güncel fiyat bozulmasın)
+    history = yf.Ticker(symbol).history(period=period, auto_adjust=True, back_adjust=False)
     return history, _latency_ms(started_at)
 
 
