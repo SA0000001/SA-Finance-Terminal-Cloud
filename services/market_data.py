@@ -118,10 +118,35 @@ def _record_parse_error(
 
 def _history_with_latency(symbol: str, *, period: str):
     started_at = time.perf_counter()
-    # auto_adjust=True: vadeli işlem kontrat rollover'larında fiyat sürekliliği sağlar
-    # back_adjust=False: geriye dönük düzeltme kapatılıyor (güncel fiyat bozulmasın)
+    # auto_adjust=True: split/dividend düzeltmesi — vadeli işlemler için gerekli
+    # back_adjust=False: geriye dönük fiyat bozulması önlenir (güncel fiyat doğru kalır)
     history = yf.Ticker(symbol).history(period=period, auto_adjust=True, back_adjust=False)
     return history, _latency_ms(started_at)
+
+
+# Vadeli işlem rollover'ında günlük değişim bozulmasın diye intraday (1d/1m) kullan
+_FUTURES_INTRADAY_CHANGE = {"CL=F", "GC=F", "SI=F", "NG=F", "HG=F", "ZW=F", "BZ=F"}
+
+
+def _fetch_futures_daily_change(symbol: str) -> float | None:
+    """
+    Vadeli işlem sembolü için günlük değişim yüzdesini intraday veriden hesaplar.
+    Rollover günlerinde eski-yeni kontrat fiyat farkından kaynaklanan
+    yanlış değişim hesabını önler.
+    """
+    try:
+        ticker = yf.Ticker(symbol)
+        # 1 günlük 1 dakikalık bar — open ve son fiyat
+        hist_1m = ticker.history(period="1d", interval="1m", auto_adjust=True)
+        if hist_1m.empty or len(hist_1m) < 2:
+            return None
+        open_price = float(hist_1m["Open"].iloc[0])
+        last_price = float(hist_1m["Close"].iloc[-1])
+        if open_price <= 0:
+            return None
+        return (last_price - open_price) / open_price * 100
+    except Exception:
+        return None
 
 
 def _download_with_latency(symbols, *, period: str):
@@ -540,9 +565,17 @@ def _load_yfinance_change_group(
                 if not math.isfinite(curr) or not math.isfinite(prev) or prev == 0:
                     raise ValueError(f"{candidate} close history has invalid values")
 
+                # Vadeli işlemler için rollover günü fiyat farkını önle:
+                # intraday open→close değişimini kullan
+                if candidate in _FUTURES_INTRADAY_CHANGE:
+                    intraday_chg = _fetch_futures_daily_change(candidate)
+                    pct = intraday_chg if intraday_chg is not None else (curr - prev) / prev * 100
+                else:
+                    pct = (curr - prev) / prev * 100
+
                 return {
                     key: value_template.format(value=curr),
-                    f"{key}_C": f"{(curr - prev) / prev * 100:.2f}%",
+                    f"{key}_C": f"{pct:.2f}%",
                 }
             except YFINANCE_EXCEPTIONS as exc:
                 errors.append(f"{candidate}: {exc}")
