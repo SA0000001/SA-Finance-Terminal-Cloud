@@ -40,7 +40,7 @@ def _base_payload() -> dict:
         "FTSE_C": "0.40%",
         "NIKKEI_C": "1.10%",
         "HSI_C": "0.80%",
-        "CSI300_C": "0.55%",
+        "SHCOMP_C": "0.55%",
         "OIL_C": "0.20%",
         "GOLD_C": "-0.40%",
         "ORDERBOOK_SIGNAL": "Ortak destek guclu",
@@ -105,11 +105,11 @@ def test_eth_fallback_keeps_crypto_coverage_controlled_when_eth_change_missing()
     assert all(asset["value"] is not None for asset in crypto_region["assets"])
 
 
-def test_asia_score_moves_toward_neutral_when_csi300_data_missing():
+def test_asia_score_moves_toward_neutral_when_shcomp_data_missing():
     with_csi = build_risk_on_off(_base_payload())
 
     without_csi_data = _base_payload()
-    without_csi_data.pop("CSI300_C")
+    without_csi_data.pop("SHCOMP_C")
     without_csi = build_risk_on_off(without_csi_data)
 
     asia_with = _find_region(with_csi["regions"], "ASIA")
@@ -153,7 +153,7 @@ def test_phase_side_and_playbook_are_derived_for_extreme_regimes():
             "OIL_C": "+1.10%",
             "NIKKEI_C": "-1.20%",
             "HSI_C": "-1.10%",
-            "CSI300_C": "-0.90%",
+            "SHCOMP_C": "-0.90%",
             "DAX_C": "-1.00%",
             "FTSE_C": "-0.70%",
         }
