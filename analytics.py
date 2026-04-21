@@ -1053,14 +1053,18 @@ def markdown_to_basic_pdf_bytes(markdown_text: str) -> bytes:
     return buffer.getvalue()
 
 
-def build_analytics_payload(data: dict) -> dict:
-    scores = build_regime_scores(data)
-    return {
-        "scores":    scores,
-        "scenarios": build_scenario_matrix(data),
-        "decision":  build_decision_verdict(data, scores),
-        "risk_on_off": build_risk_on_off(data),
-    }
+# Root analytics.py — deprecated shim. Use domain.analytics directly.
+import warnings as _warnings
+from domain.analytics import build_analytics_payload as _domain_build_analytics_payload
+
+_warnings.warn(
+    "analytics.build_analytics_payload is deprecated; import from domain.analytics instead.",
+    DeprecationWarning,
+    stacklevel=1,
+)
+
+# Re-export so callers get the canonical domain object
+build_analytics_payload = _domain_build_analytics_payload
 
 
 # ─── DECISION VERDICT (MQS + EWS) ────────────────────────────────────────────
