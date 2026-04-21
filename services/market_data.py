@@ -1,7 +1,10 @@
 import math
 import re
+import ssl
+import string
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timezone
 
 import pandas as pd
 import requests
@@ -30,6 +33,176 @@ MARKET_TTL = 300
 SENTIMENT_TTL = 1800
 MACRO_TTL = 21600
 ETF_FLOW_DATE_RE = re.compile(r"^\d{2}\s+[A-Za-z]{3}\s+\d{4}$")
+
+# ── TradingView WebSocket veri çekici ─────────────────────────────────────────
+# altin_signal_bot.py'den adapte edildi.
+# Günlük OHLCV çeker; fiyat ve değişim hesabı için kullanılır.
+
+# TW sembol eşleme tablosu: terminal_key → (tv_symbol, para_birimi_suffix)
+TV_SYMBOL_MAP: dict[str, tuple[str, str]] = {
+    # Emtia
+    "OIL":    ("NYMEX:CL1!",  "$"),   # WTI Crude — sürekli kontrat
+    "GOLD":   ("COMEX:GC1!",  "$"),   # Altın
+    "SILVER": ("COMEX:SI1!",  "$"),   # Gümüş
+    "NATGAS": ("NYMEX:NG1!",  "$"),   # Doğalgaz
+    "COPPER": ("COMEX:HG1!",  "$"),   # Bakır
+    # Endeksler
+    "SP500":  ("SP:SPX",      ""),
+    "NASDAQ": ("NASDAQ:NDX",  ""),
+    "DAX":    ("XETR:DAX",    ""),
+    "NIKKEI": ("INDEX:NKY",   ""),
+    "HSI":    ("HSI:HSI",     ""),
+    "SHCOMP": ("SSE:000001",  ""),
+    "BIST100":("BIST:XU100",  ""),
+    # FX & Faiz
+    "DXY":    ("TVC:DXY",     ""),
+    "US10Y":  ("TVC:US10Y",   "%"),
+    "EURUSD": ("FX:EURUSD",   ""),
+    "GBPUSD": ("FX:GBPUSD",   ""),
+    "USDJPY": ("FX:USDJPY",   ""),
+    "USDTRY": ("FX:USDTRY",   ""),
+    "USDCHF": ("FX:USDCHF",   ""),
+    "AUDUSD": ("FX:AUDUSD",   ""),
+}
+
+
+def _tv_rand(k: int = 12) -> str:
+    import random
+    return "".join(random.choices(string.ascii_lowercase, k=k))
+
+
+def _tv_msg(func: str, args: list) -> str:
+    body = json.dumps({"m": func, "p": args}, separators=(",", ":"))
+    return f"~m~{len(body)}~m~{body}"
+
+
+def _tv_fetch_daily_bars(tv_symbol: str, n_bars: int = 3) -> list[dict]:
+    """
+    TradingView WebSocket'ten günlük bar çeker.
+    Döner: [{"t": timestamp, "o": open, "h": high, "l": low, "c": close}, ...]
+    """
+    try:
+        import websocket as _websocket
+    except ImportError:
+        return []
+
+    bars: list[dict] = []
+    cs = f"cs_{_tv_rand()}"
+    qs = f"qs_{_tv_rand()}"
+    done = {"ok": False}
+
+    def on_message(ws, raw):
+        if re.match(r"~m~\d+~m~~h~\d+", raw):
+            ws.send(raw)
+            return
+        for part in re.findall(r"~m~\d+~m~(.+?)(?=~m~\d+~m~|$)", raw, re.DOTALL):
+            try:
+                msg = json.loads(part)
+            except Exception:
+                continue
+            m = msg.get("m", "")
+            if m in ("timescale_update", "du"):
+                try:
+                    for it in msg["p"][1]["sds_1"]["s"]:
+                        v = it["v"]
+                        bars.append({"t": v[0], "o": v[1], "h": v[2], "l": v[3], "c": v[4]})
+                except Exception:
+                    pass
+            elif m == "series_completed":
+                done["ok"] = True
+                ws.close()
+
+    def on_open(ws):
+        ws.send(_tv_msg("set_auth_token",       ["unauthorized_user_token"]))
+        ws.send(_tv_msg("chart_create_session", [cs, ""]))
+        ws.send(_tv_msg("quote_create_session", [qs]))
+        ws.send(_tv_msg("quote_add_symbols",    [qs, tv_symbol, {"flags": ["force_permission"]}]))
+        ws.send(_tv_msg("resolve_symbol",       [cs, "sds_sym_1",
+            f'={{"symbol":"{tv_symbol}","adjustment":"splits"}}']))
+        ws.send(_tv_msg("create_series",        [cs, "sds_1", "s1", "sds_sym_1", "1D", n_bars]))
+
+    try:
+        _websocket.WebSocketApp(
+            "wss://data.tradingview.com/socket.io/websocket?from=chart%2F&date=&type=chart",
+            header={"Origin": "https://www.tradingview.com", "User-Agent": "Mozilla/5.0"},
+            on_open=on_open,
+            on_message=on_message,
+            on_error=lambda ws, e: None,
+            on_close=lambda ws, *a: None,
+        ).run_forever(sslopt={"cert_reqs": ssl.CERT_NONE})
+    except Exception:
+        pass
+
+    return bars
+
+
+def _tv_quote(tv_symbol: str) -> dict | None:
+    """
+    TW'den son 2 günlük bar çeker, fiyat ve günlük değişim hesaplar.
+    Döner: {"price": float, "change_pct": float} veya None
+    """
+    bars = _tv_fetch_daily_bars(tv_symbol, n_bars=3)
+    if len(bars) < 2:
+        return None
+    bars_sorted = sorted(bars, key=lambda b: b["t"])
+    last = bars_sorted[-1]
+    prev = bars_sorted[-2]
+    price = last["c"]
+    prev_close = prev["c"]
+    if not price or not prev_close or prev_close == 0:
+        return None
+    return {
+        "price":      price,
+        "change_pct": (price - prev_close) / prev_close * 100,
+    }
+
+
+def _load_tv_group(
+    target: dict,
+    recorder: HealthRecorder,
+    source: str,
+    keys: list[str],
+    value_template: str,
+) -> None:
+    """
+    TV_SYMBOL_MAP'teki sembolleri TradingView'den çeker.
+    target'a {KEY: fiyat, KEY_C: değişim%} yazar.
+    """
+    started_at = time.perf_counter()
+    successes = 0
+    failures = []
+
+    def fetch_one(key: str):
+        entry = TV_SYMBOL_MAP.get(key)
+        if not entry:
+            raise ValueError(f"{key} TV_SYMBOL_MAP'te yok")
+        tv_sym, _ = entry
+        result = _tv_quote(tv_sym)
+        if result is None:
+            raise ValueError(f"{tv_sym} için veri alınamadı")
+        return {
+            key:          value_template.format(value=result["price"]),
+            f"{key}_C":   f"{result['change_pct']:.2f}%",
+        }
+
+    with ThreadPoolExecutor(max_workers=min(4, len(keys))) as executor:
+        future_map = {executor.submit(fetch_one, k): k for k in keys}
+        for future in as_completed(future_map):
+            key = future_map[future]
+            try:
+                target.update(future.result())
+                successes += 1
+            except Exception as exc:
+                failures.append(f"{key}: {exc}")
+                _set_defaults(target, {key: PLACEHOLDER, f"{key}_C": PLACEHOLDER})
+
+    latency = _latency_ms(started_at)
+    if successes:
+        recorder.success(source, latency)
+    else:
+        recorder.failure(source, "; ".join(failures) or "No TV data", latency)
+
+
 
 
 def _cache_data_headless_safe(*cache_args, **cache_kwargs):
@@ -1092,59 +1265,79 @@ def _legacy_veri_motoru(fred_api_key=""):
             stale_after_seconds=43200,
         )
 
-    _load_yfinance_change_group(
-        data,
-        health,
-        "yFinance Indices",
-        {
-            "SP500": "^GSPC",
-            "NASDAQ": "^IXIC",
-            "DOW": "^DJI",
-            "DAX": "^GDAXI",
-            "FTSE": "^FTSE",
-            "NIKKEI": "^N225",
-            "HSI": "^HSI",
-            "SHCOMP": ("000001.SS", "^SSEC"),
-            "BIST100": "XU100.IS",
-            "VIX": "^VIX",
-        },
-        period="10d",
+    # ── Endeksler: TradingView önce, yfinance fallback ───────────────────────
+    _load_tv_group(
+        data, health, "TradingView Indices",
+        ["SP500", "NASDAQ", "DAX", "NIKKEI", "HSI", "SHCOMP", "BIST100"],
         value_template="{value:,.2f}",
     )
+    # TW'den gelmeyen / eksik kalan semboller için yfinance fallback
+    _tv_missing_indices = {k: v for k, v in {
+        "SP500":   "^GSPC",
+        "NASDAQ":  "^IXIC",
+        "DOW":     "^DJI",
+        "DAX":     "^GDAXI",
+        "FTSE":    "^FTSE",
+        "NIKKEI":  "^N225",
+        "HSI":     "^HSI",
+        "SHCOMP":  ("000001.SS", "^SSEC"),
+        "BIST100": "XU100.IS",
+        "VIX":     "^VIX",
+    }.items() if data.get(k, PLACEHOLDER) == PLACEHOLDER}
+    if _tv_missing_indices:
+        _load_yfinance_change_group(
+            data, health, "yFinance Indices (fallback)",
+            _tv_missing_indices,
+            period="10d",
+            value_template="{value:,.2f}",
+        )
 
-    _load_yfinance_change_group(
-        data,
-        health,
-        "yFinance Commodities",
-        {
-            "GOLD": "GC=F",
-            "SILVER": "SI=F",
-            "OIL": "CL=F",
-            "NATGAS": "NG=F",
-            "COPPER": "HG=F",
-            "WHEAT": "ZW=F",
-        },
-        period="5d",
+    # ── Emtia: TradingView önce, yfinance fallback ───────────────────────────
+    _load_tv_group(
+        data, health, "TradingView Commodities",
+        ["OIL", "GOLD", "SILVER", "NATGAS", "COPPER"],
         value_template="${value:,.2f}",
     )
+    _tv_missing_comm = {k: v for k, v in {
+        "GOLD":   "GC=F",
+        "SILVER": "SI=F",
+        "OIL":    "CL=F",
+        "NATGAS": "NG=F",
+        "COPPER": "HG=F",
+        "WHEAT":  "ZW=F",
+    }.items() if data.get(k, PLACEHOLDER) == PLACEHOLDER}
+    if _tv_missing_comm:
+        _load_yfinance_change_group(
+            data, health, "yFinance Commodities (fallback)",
+            _tv_missing_comm,
+            period="5d",
+            value_template="${value:,.2f}",
+        )
 
-    _load_yfinance_change_group(
-        data,
-        health,
-        "yFinance FX",
-        {
-            "DXY": "DX-Y.NYB",
-            "EURUSD": "EURUSD=X",
-            "GBPUSD": "GBPUSD=X",
-            "USDJPY": "JPY=X",
-            "USDTRY": "TRY=X",
-            "USDCHF": "CHF=X",
-            "AUDUSD": "AUDUSD=X",
-            "US10Y": "^TNX",
-        },
-        period="5d",
+    # ── FX & Faiz: TradingView önce, yfinance fallback ──────────────────────
+    _load_tv_group(
+        data, health, "TradingView FX",
+        ["DXY", "EURUSD", "GBPUSD", "USDJPY", "USDTRY", "USDCHF", "AUDUSD", "US10Y"],
         value_template="{value:.4f}",
     )
+    _tv_missing_fx = {k: v for k, v in {
+        "DXY":    "DX-Y.NYB",
+        "EURUSD": "EURUSD=X",
+        "GBPUSD": "GBPUSD=X",
+        "USDJPY": "JPY=X",
+        "USDTRY": "TRY=X",
+        "USDCHF": "CHF=X",
+        "AUDUSD": "AUDUSD=X",
+        "US10Y":  "^TNX",
+    }.items() if data.get(k, PLACEHOLDER) == PLACEHOLDER}
+    if _tv_missing_fx:
+        _load_yfinance_change_group(
+            data, health, "yFinance FX (fallback)",
+            _tv_missing_fx,
+            period="5d",
+            value_template="{value:.4f}",
+        )
+
 
     correlation_payload = None
     correlation_latency = None
@@ -1632,50 +1825,45 @@ def _fetch_market_snapshot():
 
     yfinance_tasks = {
         "etfs": lambda: _load_yfinance_etfs(data, health),
-        "indices": lambda: _load_yfinance_change_group(
-            data,
-            health,
-            "yFinance Indices",
-            {
-                "SP500": "^GSPC",
-                "NASDAQ": "^IXIC",
-                "DOW": "^DJI",
-                "DAX": "^GDAXI",
-                "FTSE": "^FTSE",
-                "NIKKEI": "^N225",
-                "HSI": "^HSI",
-                "SHCOMP": ("000001.SS", "^SSEC"),
-                "BIST100": "XU100.IS",
-                "VIX": "^VIX",
-            },
-            period="10d",
+        "indices": lambda: _load_tv_group(
+            data, health, "TradingView Indices",
+            ["SP500", "NASDAQ", "DAX", "NIKKEI", "HSI", "SHCOMP", "BIST100"],
             value_template="{value:,.2f}",
-        ),
-        "commodities": lambda: _load_yfinance_change_group(
-            data,
-            health,
-            "yFinance Commodities",
-            {"GOLD": "GC=F", "SILVER": "SI=F", "OIL": "CL=F", "NATGAS": "NG=F", "COPPER": "HG=F", "WHEAT": "ZW=F"},
-            period="5d",
+        ) or _load_yfinance_change_group(
+            data, health, "yFinance Indices (fallback)",
+            {k: v for k, v in {
+                "SP500": "^GSPC", "NASDAQ": "^IXIC", "DOW": "^DJI",
+                "DAX": "^GDAXI", "FTSE": "^FTSE", "NIKKEI": "^N225",
+                "HSI": "^HSI", "SHCOMP": ("000001.SS", "^SSEC"),
+                "BIST100": "XU100.IS", "VIX": "^VIX",
+            }.items() if data.get(k, PLACEHOLDER) == PLACEHOLDER},
+            period="10d", value_template="{value:,.2f}",
+        ) if any(data.get(k, PLACEHOLDER) == PLACEHOLDER for k in ["SP500","NASDAQ","DAX","NIKKEI","HSI"]) else None,
+        "commodities": lambda: _load_tv_group(
+            data, health, "TradingView Commodities",
+            ["OIL", "GOLD", "SILVER", "NATGAS", "COPPER"],
             value_template="${value:,.2f}",
-        ),
-        "fx": lambda: _load_yfinance_change_group(
-            data,
-            health,
-            "yFinance FX",
-            {
-                "DXY": "DX-Y.NYB",
-                "EURUSD": "EURUSD=X",
-                "GBPUSD": "GBPUSD=X",
-                "USDJPY": "JPY=X",
-                "USDTRY": "TRY=X",
-                "USDCHF": "CHF=X",
-                "AUDUSD": "AUDUSD=X",
-                "US10Y": "^TNX",
-            },
-            period="5d",
+        ) or _load_yfinance_change_group(
+            data, health, "yFinance Commodities (fallback)",
+            {k: v for k, v in {
+                "GOLD": "GC=F", "SILVER": "SI=F", "OIL": "CL=F",
+                "NATGAS": "NG=F", "COPPER": "HG=F", "WHEAT": "ZW=F",
+            }.items() if data.get(k, PLACEHOLDER) == PLACEHOLDER},
+            period="5d", value_template="${value:,.2f}",
+        ) if any(data.get(k, PLACEHOLDER) == PLACEHOLDER for k in ["OIL","GOLD","SILVER"]) else None,
+        "fx": lambda: _load_tv_group(
+            data, health, "TradingView FX",
+            ["DXY", "EURUSD", "GBPUSD", "USDJPY", "USDTRY", "USDCHF", "AUDUSD", "US10Y"],
             value_template="{value:.4f}",
-        ),
+        ) or _load_yfinance_change_group(
+            data, health, "yFinance FX (fallback)",
+            {k: v for k, v in {
+                "DXY": "DX-Y.NYB", "EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X",
+                "USDJPY": "JPY=X", "USDTRY": "TRY=X", "USDCHF": "CHF=X",
+                "AUDUSD": "AUDUSD=X", "US10Y": "^TNX",
+            }.items() if data.get(k, PLACEHOLDER) == PLACEHOLDER},
+            period="5d", value_template="{value:.4f}",
+        ) if any(data.get(k, PLACEHOLDER) == PLACEHOLDER for k in ["DXY","EURUSD","US10Y"]) else None,
         "breadth": lambda: _load_yfinance_change_group(
             data,
             health,
