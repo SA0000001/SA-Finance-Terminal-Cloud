@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+from datetime import datetime
 from io import BytesIO
 
 from domain.parsers import parse_number
@@ -65,6 +67,45 @@ def clamp_score(value: float) -> int:
 
 def _display(value) -> str:
     return str(value) if value not in (None, "", PLACEHOLDER) else PLACEHOLDER
+
+
+def _is_placeholder(value) -> bool:
+    return value in (None, "", PLACEHOLDER)
+
+
+def _numeric_market_cap(data: dict, display_key: str, numeric_key: str) -> float | None:
+    """Market cap değerini sayısal biçimde döndürür. T/B/M suffix'ini doğru ölçeklendirir."""
+    warnings_list = data.setdefault("_score_warnings", [])
+    numeric = data.get(numeric_key)
+    if isinstance(numeric, (int, float)) and numeric > 0:
+        return float(numeric)
+    raw = data.get(display_key)
+    parsed = parse_number(raw)
+    if parsed is None:
+        return None
+    text = str(raw).upper()
+    if "T" in text:
+        return parsed * 1_000_000_000_000
+    if "B" in text:
+        return parsed * 1_000_000_000
+    if "M" in text:
+        return parsed * 1_000_000
+    warnings_list.append(f"{display_key} has no explicit T/B/M unit; ratio confidence is low.")
+    return parsed
+
+
+def _bounded_ratio_pct(
+    numerator: float | None, denominator: float | None, label: str, warnings_list: list[str]
+) -> float | None:
+    """Güvenli oran hesabı — imkânsız değerleri (0>x>100) yakalar ve uyarır."""
+    if numerator is None or denominator is None or denominator <= 0:
+        warnings_list.append(f"{label} ratio unavailable; numerator/denominator missing or invalid.")
+        return None
+    ratio = (numerator / denominator) * 100
+    if ratio < 0 or ratio > 100:
+        warnings_list.append(f"{label} ratio {ratio:.2f}% is outside 0-100; clamped for scoring/display.")
+        ratio = max(0.0, min(100.0, ratio))
+    return ratio
 
 
 def _linear_score(value: float | None, low: float, high: float, *, inverse: bool = False) -> int:
@@ -547,17 +588,18 @@ def _build_macro_breadth_factor(data: dict) -> dict:
 
 
 def _build_crypto_breadth_factor(data: dict) -> dict:
-    total = parse_number(data.get("TOTAL_CAP"))
-    total2 = parse_number(data.get("TOTAL2_CAP"))
-    total3 = parse_number(data.get("TOTAL3_CAP"))
-    others = parse_number(data.get("OTHERS_CAP"))
+    warnings_list = data.setdefault("_score_warnings", [])
+    total  = _numeric_market_cap(data, "TOTAL_CAP",  "TOTAL_CAP_NUM")
+    total2 = _numeric_market_cap(data, "TOTAL2_CAP", "TOTAL2_CAP_NUM")
+    total3 = _numeric_market_cap(data, "TOTAL3_CAP", "TOTAL3_CAP_NUM")
+    others = _numeric_market_cap(data, "OTHERS_CAP", "OTHERS_CAP_NUM")
     btc_dom = parse_number(data.get("Dom"))
     eth_dom = parse_number(data.get("ETH_Dom"))
     btc_change = parse_number(data.get("BTC_C"))
 
-    total2_ratio = ((total2 / total) * 100) if total and total2 else None
-    total3_ratio = ((total3 / total) * 100) if total and total3 else None
-    others_ratio = ((others / total) * 100) if total and others else None
+    total2_ratio = _bounded_ratio_pct(total2, total, "TOTAL2/TOTAL", warnings_list)
+    total3_ratio = _bounded_ratio_pct(total3, total, "TOTAL3/TOTAL", warnings_list)
+    others_ratio = _bounded_ratio_pct(others, total, "OTHERS/TOTAL", warnings_list)
     trend_support = 55
     if (btc_change or 0) > 2 and (total3_ratio or 0) > 30:
         trend_support = 78
@@ -1053,14 +1095,308 @@ def markdown_to_basic_pdf_bytes(markdown_text: str) -> bytes:
     return buffer.getvalue()
 
 
-def build_analytics_payload(data: dict) -> dict:
-    scores = build_regime_scores(data)
+REQUIRED_RISK_ON_OFF_FIELDS = {
+    "global_score", "global_signal", "strict_score", "strict_signal",
+    "live_score", "sync_q", "agree_q", "regions", "macro_stress",
+    "phase", "side_bias", "playbook", "confidence_tier",
+    "decomposition", "cross_asset_transmission", "ai_analysis",
+}
+
+TELEMETRY_METRIC_NAMES = {
+    "validation_warning_count",
+    "data_health_failed_source_count",
+    "unknown_region_count",
+    "region_coverage_score",
+    "source_timestamp_span_seconds",
+    "crypto_cap_ratio_clamp_count",
+    "global_signal_flip_count",
+    "decision_verdict_flip_count",
+    "mqs_minus_ews_gap",
+    "btc_nq_spread_pp",
+    "macro_stress_score",
+    "yfinance_failed_symbol_count",
+}
+
+
+def _parse_iso(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
+        return None
+
+
+def _health_entries(data: dict) -> dict:
+    return data.get("_health", {}) or {}
+
+
+def _failed_sources(data: dict) -> list[str]:
+    return sorted(source for source, entry in _health_entries(data).items() if not entry.get("ok"))
+
+
+def _source_timestamp_span_seconds(data: dict) -> float:
+    timestamps = [
+        parsed
+        for entry in _health_entries(data).values()
+        for parsed in [_parse_iso(entry.get("last_success_at") or entry.get("fetched_at"))]
+        if parsed is not None
+    ]
+    if len(timestamps) < 2:
+        return 0.0
+    return max(0.0, (max(timestamps) - min(timestamps)).total_seconds())
+
+
+def _yfinance_failed_symbol_count(data: dict) -> int:
+    import re as _re
+    failed_symbols: set[str] = set()
+    for source, entry in _health_entries(data).items():
+        if "yfinance" not in source.lower() or entry.get("ok"):
+            continue
+        error = str(entry.get("error", ""))
+        failed_symbols.update(_re.findall(r"\b[A-Z][A-Z0-9_=.^^-]{1,12}\b(?=:)", error))
+        failed_symbols.update(_re.findall(r"'([^']+)'", error))
+    return len(failed_symbols)
+
+
+def _collect_validation_warnings(data: dict, payload: dict) -> list[str]:
+    warnings = list(data.get("_score_warnings", []))
+    failed = _failed_sources(data)
+    if failed:
+        warnings.append(f"Data health failures: {', '.join(failed)}.")
+    span_seconds = _source_timestamp_span_seconds(data)
+    if span_seconds > 900:
+        warnings.append(f"Source timestamp span is {span_seconds:.0f}s; same-session comparability is reduced.")
+    for region in payload.get("risk_on_off", {}).get("regions", []):
+        warnings.extend(region.get("warnings", []))
+    return sorted(set(warnings))
+
+
+def _validate_dashboard_payload(payload: dict) -> None:
+    risk_payload = payload.get("risk_on_off", {})
+    missing = sorted(REQUIRED_RISK_ON_OFF_FIELDS - set(risk_payload))
+    if missing:
+        raise KeyError(f"risk_on_off payload missing dashboard fields: {', '.join(missing)}")
+    for region in risk_payload.get("regions", []):
+        missing_region = {"coverage_quality", "confidence_tier", "weight_pct"} - set(region)
+        if missing_region:
+            raise KeyError(
+                f"{region.get('name', 'region')} payload missing fields: {', '.join(sorted(missing_region))}"
+            )
+
+
+def _extract_score_value(payload: dict | None, dotted_path: str):
+    current = payload or {}
+    for part in dotted_path.split("."):
+        if not isinstance(current, dict):
+            return None
+        current = current.get(part)
+    return current
+
+
+def _build_production_telemetry(data: dict, payload: dict, previous_payload: dict | None = None) -> dict:
+    risk = payload.get("risk_on_off", {})
+    decision = payload.get("decision", {})
+    warnings = payload.get("validation_warnings", [])
+    regions = risk.get("regions", [])
+    failed_sources = _failed_sources(data)
+    region_coverage = {region.get("name", "region"): region.get("coverage_score", 0) for region in regions}
+    btc_nq = next(
+        (
+            item.get("spread")
+            for item in risk.get("cross_asset_transmission", {}).get("items", [])
+            if item.get("pair") == "BTC/NQ"
+        ),
+        None,
+    )
+    current_global_signal = risk.get("global_signal")
+    previous_global_signal = _extract_score_value(previous_payload, "risk_on_off.global_signal")
+    current_verdict = _extract_score_value(decision, "verdict.verdict_en") or _extract_score_value(
+        decision, "verdict.verdict"
+    )
+    previous_verdict = _extract_score_value(previous_payload, "decision.verdict.verdict_en") or _extract_score_value(
+        previous_payload, "decision.verdict.verdict"
+    )
+    score_warnings = data.get("_score_warnings", [])
+
+    metrics = {
+        "validation_warning_count": len(warnings),
+        "data_health_failed_source_count": len(failed_sources),
+        "unknown_region_count": sum(1 for region in regions if region.get("signal") == "UNKNOWN"),
+        "region_coverage_score": region_coverage,
+        "source_timestamp_span_seconds": round(_source_timestamp_span_seconds(data), 1),
+        "crypto_cap_ratio_clamp_count": sum(1 for w in score_warnings if "outside 0-100" in w),
+        "global_signal_flip_count": int(
+            bool(previous_global_signal)
+            and bool(current_global_signal)
+            and previous_global_signal != current_global_signal
+        ),
+        "decision_verdict_flip_count": int(
+            bool(previous_verdict) and bool(current_verdict) and previous_verdict != current_verdict
+        ),
+        "mqs_minus_ews_gap": (decision.get("mqs", {}).get("score", 0) - decision.get("ews", {}).get("score", 0)),
+        "btc_nq_spread_pp": btc_nq,
+        "macro_stress_score": risk.get("macro_stress", {}).get("score"),
+        "yfinance_failed_symbol_count": _yfinance_failed_symbol_count(data),
+    }
+    missing = sorted(TELEMETRY_METRIC_NAMES - set(metrics))
+    if missing:
+        raise KeyError(f"telemetry payload missing metrics: {', '.join(missing)}")
+
     return {
-        "scores":    scores,
-        "scenarios": build_scenario_matrix(data),
-        "decision":  build_decision_verdict(data, scores),
+        "metrics": metrics,
+        "failed_sources": failed_sources,
+        "data_quality_summary": {
+            "validation_warning_count": metrics["validation_warning_count"],
+            "failed_source_count": metrics["data_health_failed_source_count"],
+            "unknown_region_count": metrics["unknown_region_count"],
+            "timestamp_span_seconds": metrics["source_timestamp_span_seconds"],
+            "coverage": risk.get("coverage", "-"),
+        },
+    }
+
+
+def _alert(severity: str, code: str, message: str, value, threshold) -> dict:
+    return {"severity": severity, "code": code, "message": message, "value": value, "threshold": threshold}
+
+
+def _build_observability_alerts(telemetry: dict) -> list[dict]:
+    metrics = telemetry.get("metrics", {})
+    alerts = []
+    if metrics.get("unknown_region_count", 0) >= 2:
+        alerts.append(_alert("critical", "UNKNOWN_REGION_COVERAGE",
+            "Two or more region cards are UNKNOWN; global risk confidence must be discounted.",
+            metrics.get("unknown_region_count"), ">=2"))
+    if metrics.get("source_timestamp_span_seconds", 0) > 900:
+        alerts.append(_alert("warning", "SOURCE_TIMESTAMP_MISMATCH",
+            "Source timestamps are outside same-session tolerance.",
+            metrics.get("source_timestamp_span_seconds"), ">900"))
+    if metrics.get("crypto_cap_ratio_clamp_count", 0) > 0:
+        alerts.append(_alert("critical", "CRYPTO_RATIO_CLAMP",
+            "At least one crypto market-cap ratio was impossible and had to be clamped.",
+            metrics.get("crypto_cap_ratio_clamp_count"), ">0"))
+    if metrics.get("validation_warning_count", 0) > 0:
+        alerts.append(_alert("warning", "VALIDATION_WARNINGS_PRESENT",
+            "Score payload contains validation warnings that should be visible to the operator.",
+            metrics.get("validation_warning_count"), ">0"))
+    if metrics.get("decision_verdict_flip_count", 0) >= 3:
+        alerts.append(_alert("critical", "DECISION_VERDICT_FLIP_SPIKE",
+            "Decision verdict flip count is anomalously high for the replay/live window.",
+            metrics.get("decision_verdict_flip_count"), ">=3"))
+    if metrics.get("global_signal_flip_count", 0) >= 3:
+        alerts.append(_alert("critical", "GLOBAL_SIGNAL_FLIP_SPIKE",
+            "Global signal flip count is anomalously high for the replay/live window.",
+            metrics.get("global_signal_flip_count"), ">=3"))
+    if metrics.get("data_health_failed_source_count", 0) > 2:
+        alerts.append(_alert("warning", "FAILED_SOURCE_COUNT",
+            "Multiple providers failed in this snapshot.",
+            metrics.get("data_health_failed_source_count"), ">2"))
+    return alerts
+
+
+def _provider_impact_for_source(source: str) -> dict:
+    source_lower = source.lower()
+    if "yfinance" in source_lower:
+        if "indices" in source_lower:
+            cards = ["ASIA", "EUROPE", "US FUTURES", "Global Risk On/Off"]
+        elif "breadth" in source_lower or "etfs" in source_lower:
+            cards = ["Macro Breadth", "Composite Participation", "MQS"]
+        elif "commodities" in source_lower or "correlation" in source_lower:
+            cards = ["Macro Stress Block", "Cross-Asset Transmission"]
+        else:
+            cards = ["Macro & Markets"]
+        return {"source": source, "policy": "visible_fallback", "impacted_cards": cards}
+    if source.startswith("FRED"):
+        return {"source": source, "policy": "visible_fallback", "impacted_cards": ["Policy & Liquidity", "Data Atlas"]}
+    if "market cap" in source.lower():
+        return {"source": source, "policy": "fallback_then_warn", "impacted_cards": ["Crypto Breadth", "Composite Participation", "MQS"]}
+    return {"source": source, "policy": "visible_warning", "impacted_cards": ["Data Quality"]}
+
+
+def _build_provider_degradation_policy(data: dict, payload: dict) -> dict:
+    failed = _failed_sources(data)
+    policies = [_provider_impact_for_source(source) for source in failed]
+    for region in payload.get("risk_on_off", {}).get("regions", []):
+        if region.get("signal") == "UNKNOWN":
+            policies.append({
+                "source": f"{region.get('name')} coverage",
+                "policy": "force_unknown",
+                "impacted_cards": [region.get("name"), "Global Risk On/Off"],
+            })
+    return {"mode": "visible_degradation" if policies else "normal", "policies": policies}
+
+
+def _build_decision_explainability(payload: dict, telemetry: dict) -> dict:
+    scores = payload.get("scores", {})
+    decision = payload.get("decision", {})
+    verdict = decision.get("verdict", {})
+    mqs = decision.get("mqs", {})
+    ews = decision.get("ews", {})
+    risk = payload.get("risk_on_off", {})
+    factors = scores.get("factors", [])
+    factor_by_label = {factor.get("label"): factor for factor in factors}
+
+    threshold_hits = []
+    if mqs.get("score", 0) < 45:
+        threshold_hits.append({"code": "MQS_HARD_NO", "value": mqs.get("score"), "threshold": "<45"})
+    if ews.get("score", 0) < 40:
+        threshold_hits.append({"code": "EWS_HARD_NO", "value": ews.get("score"), "threshold": "<40"})
+    if scores.get("fragility", {}).get("score", 0) >= 70:
+        threshold_hits.append({"code": "FRAGILITY_HARD_NO", "value": scores.get("fragility", {}).get("score"), "threshold": ">=70"})
+    if scores.get("overall", 0) < 35:
+        threshold_hits.append({"code": "OVERALL_HARD_NO", "value": scores.get("overall"), "threshold": "<35"})
+    if mqs.get("score", 0) >= 60 and ews.get("score", 0) >= 58:
+        threshold_hits.append({"code": "GO_GATE_OPEN", "value": f"MQS {mqs.get('score')} / EWS {ews.get('score')}", "threshold": "60/58"})
+    if telemetry.get("metrics", {}).get("unknown_region_count", 0):
+        threshold_hits.append({"code": "DATA_QUALITY_DISCOUNT", "value": telemetry["metrics"]["unknown_region_count"], "threshold": "unknown regions > 0"})
+
+    reason_codes = [item["code"] for item in threshold_hits]
+    if not reason_codes:
+        reason_codes.append("NO_MAJOR_THRESHOLD_HIT")
+    reason_codes.append(f"VERDICT_{verdict.get('verdict_en', verdict.get('verdict', 'UNKNOWN')).replace(' ', '_')}")
+
+    dominant_label = scores.get("dominant_driver", "-")
+    weakest_label = scores.get("weakest_driver", "-")
+    dominant = factor_by_label.get(dominant_label, {})
+    weakest = factor_by_label.get(weakest_label, {})
+    top_positive = [{"label": i.get("label"), "value": i.get("change"), "impact": i.get("impact")} for i in risk.get("drivers", [])[:3]]
+    top_negative = [{"label": i.get("label"), "value": i.get("change"), "impact": i.get("impact")} for i in risk.get("drags", [])[:3]]
+
+    return {
+        "decision_reason_codes": reason_codes,
+        "top_positive_drivers": top_positive,
+        "top_negative_drivers": top_negative,
+        "threshold_hits": threshold_hits,
+        "guardrail_warnings": payload.get("validation_warnings", []),
+        "data_quality_summary": telemetry.get("data_quality_summary", {}),
+        "dominant_driver_reason": (
+            f"{dominant_label} has the largest weighted contribution "
+            f"({dominant.get('contribution', 0):.1f} pt at {dominant.get('weight_pct', 0)}% weight)."
+        ),
+        "weakest_link_reason": (
+            f"{weakest_label} has the lowest factor score "
+            f"({weakest.get('score', 0)}/100); it is the first place to watch for invalidation."
+        ),
+    }
+
+
+def build_analytics_payload(data: dict, previous_payload: dict | None = None) -> dict:
+    scores = build_regime_scores(data)
+    payload = {
+        "scores":     scores,
+        "scenarios":  build_scenario_matrix(data),
+        "decision":   build_decision_verdict(data, scores),
         "risk_on_off": build_risk_on_off(data),
     }
+    payload["validation_warnings"] = _collect_validation_warnings(data, payload)
+    payload["telemetry"] = _build_production_telemetry(data, payload, previous_payload=previous_payload)
+    payload["observability_alerts"] = _build_observability_alerts(payload["telemetry"])
+    payload["provider_degradation"] = _build_provider_degradation_policy(data, payload)
+    explainability = _build_decision_explainability(payload, payload["telemetry"])
+    payload["decision"]["explainability"] = explainability
+    payload["decision"].update(explainability)
+    _validate_dashboard_payload(payload)
+    return payload
 
 
 # ??? DECISION VERDICT (MQS + EWS) ????????????????????????????????????????????
@@ -1152,100 +1488,97 @@ def _build_ews(data: dict, scores: dict) -> dict:
     Execution Window Score — şu an işlem zamanlaması uygun mu?
     Order book, momentum ve volatility hızına bakarak kırılma/geri çekilme
     kalitesini değerlendirir.
-    
+
     Bileşenler:
       Order book signal  %30  — destek/direnç sağlamlığı
-      Momentum quality   %25  — fiyat-akşı uyumu
+      Momentum quality   %25  — fiyat-akış uyumu (direction-aware)
       Vol regime         %25  — ani şok riski
       Positioning room   %20  — squeeze ve crowding alanı
     """
     factors = {f["key"]: f for f in scores["factors"]}
-    
-    # Order book kalitesi
-    ob_signal = data.get("ORDERBOOK_SIGNAL", "")
-    ob_score = 55  # varsayılan nötr
-    if isinstance(ob_signal, str):
-        sig_lower = ob_signal.lower()
-        if any(w in sig_lower for w in ["strong buy", "buy", "support", "destek", "alim", "güçlü destek", "guclu destek"]):
-            ob_score = 78
-        elif any(w in sig_lower for w in ["strong sell", "sell", "resistance", "direnç", "direnc", "satim", "baskı", "baski"]):
-            ob_score = 28
-        elif any(w in sig_lower for w in ["neutral", "mixed", "nötr", "notr", "karma"]):
-            ob_score = 52
-        # ORDERBOOK_SIGNAL_CLASS / BADGE fallback
-        ob_badge = data.get("ORDERBOOK_SIGNAL_BADGE", "")
-        ob_class = data.get("ORDERBOOK_SIGNAL_CLASS", "")
-        if ob_score == 55:  # hâlâ nötr ise badge/class'a bak
-            if "SUPPORT" in str(ob_badge).upper() or "signal-long" in str(ob_class):
-                ob_score = 78
-            elif "RESISTANCE" in str(ob_badge).upper() or "signal-short" in str(ob_class):
-                ob_score = 28
 
-    # Momentum kalitesi — fiyat hareketi + taker uyumu
+    # Order book kalitesi — merged signal (text + badge + class)
+    ob_signal = str(data.get("ORDERBOOK_SIGNAL", "") or "")
+    ob_badge  = str(data.get("ORDERBOOK_SIGNAL_BADGE", "") or "")
+    ob_class  = str(data.get("ORDERBOOK_SIGNAL_CLASS", "") or "")
+    merged    = " ".join([ob_signal.lower(), ob_badge.lower(), ob_class.lower()])
+
+    has_long_hint  = any(t in merged for t in ("support", "destek", "buy", "long", "signal-long"))
+    has_short_hint = any(t in merged for t in ("resistance", "direnc", "sell", "short", "signal-short"))
+    has_neutral    = any(t in merged for t in ("mixed", "neutral", "karisik", "watch", "range"))
+
+    if has_long_hint and not has_short_hint:
+        ob_score = 76
+        ob_bias  = "LONG"
+    elif has_short_hint and not has_long_hint:
+        ob_score = 76
+        ob_bias  = "SHORT"
+    elif has_neutral:
+        ob_score = 52
+        ob_bias  = "NEUTRAL"
+    else:
+        ob_score = 55
+        ob_bias  = "NEUTRAL"
+
+    # Momentum kalitesi — direction-aware fiyat-akış uyumu
     btc_change = parse_number(data.get("BTC_C")) or 0.0
     taker      = parse_number(data.get("Taker")) or 1.0
     etf_flow   = parse_number(data.get("ETF_FLOW_TOTAL")) or 0.0
-    
-    # Fiyat yn ile taker ve ETF uyuyor mu?
-    momentum_score = 50
-    if btc_change > 0 and taker > 1.02 and etf_flow > 0:
-        momentum_score = 80
-    elif btc_change > 0 and taker > 1.02:
-        momentum_score = 68
-    elif btc_change < 0 and taker < 0.98 and etf_flow < 0:
-        momentum_score = 22  # g—l aşağı momentum
-    elif btc_change < 0 and taker < 0.98:
-        momentum_score = 35
-    elif abs(btc_change) < 0.5:
-        momentum_score = 55  # dz, belirsiz
-    
-    # Vol rejimi — ani şok riski
+
+    if abs(btc_change) < 0.35:
+        momentum_score = 52
+        momentum_bias  = "NEUTRAL"
+    else:
+        direction      = 1 if btc_change > 0 else -1
+        momentum_bias  = "LONG" if direction > 0 else "SHORT"
+        taker_aligned  = taker >= 1.02 if direction > 0 else taker <= 0.98
+        flow_aligned   = etf_flow >= 0 if direction > 0 else etf_flow <= 0
+        strong_move    = abs(btc_change) >= 2.5
+
+        momentum_score = 40
+        momentum_score += 24 if taker_aligned else -8
+        momentum_score += 18 if flow_aligned else -10
+        if strong_move and taker_aligned:
+            momentum_score += 8
+        if abs(btc_change) >= 4 and not taker_aligned:
+            momentum_score -= 8
+        momentum_score = clamp_score(max(18, min(88, momentum_score)))
+
     vol_score = factors["volatility"]["score"]
-    
-    # Positioning alanı — crowding ne kadar?
     pos_score = factors["positioning"]["score"]
-    
-    base = (
-        ob_score       * 0.30 +
-        momentum_score * 0.25 +
-        vol_score      * 0.25 +
-        pos_score      * 0.20
-    )
-    
-    ews = clamp_score(base)
-    
+
+    base = ob_score * 0.30 + momentum_score * 0.25 + vol_score * 0.25 + pos_score * 0.20
+    ews  = clamp_score(base)
+
     components = [
-        {"key": "orderbook",  "label": "Order Book",  "score": ob_score,       "weight": 30},
-        {"key": "momentum",   "label": "Momentum",    "score": momentum_score,  "weight": 25},
-        {"key": "volatility", "label": "Vol Regime",  "score": vol_score,       "weight": 25},
-        {"key": "positioning","label": "Positioning Room","score": pos_score,   "weight": 20},
+        {"key": "orderbook",   "label": "Order Book",       "score": ob_score,       "weight": 30},
+        {"key": "momentum",    "label": "Momentum",         "score": momentum_score,  "weight": 25},
+        {"key": "volatility",  "label": "Vol Regime",       "score": vol_score,       "weight": 25},
+        {"key": "positioning", "label": "Positioning Room", "score": pos_score,       "weight": 20},
     ]
-    
+
     strongest = max(components, key=lambda c: c["score"])
     weakest   = min(components, key=lambda c: c["score"])
-    
+
     if ews >= 62:
-        label = "Pencere Açık"
-        color = "positive"
+        label, color = "Pencere Açık", "positive"
     elif ews >= 45:
-        label = "Dikkatli Ol"
-        color = "warning"
+        label, color = "Dikkatli Ol", "warning"
     else:
-        label = "Pencere Kapalı"
-        color = "negative"
-    
-    # Destek / direnç seviyeleri
-    sup = data.get("Sup_Wall", "-")
-    res = data.get("Res_Wall", "-")
-    
-    # Bias: orderbook sinyali + momentum yönünden türet
-    btc_change_val = parse_number(data.get("BTC_C")) or 0.0
-    if ob_score >= 70 and btc_change_val > 0:
+        label, color = "Pencere Kapalı", "negative"
+
+    # Bias: ob + momentum yönü
+    if ob_bias == "LONG" and momentum_bias == "LONG":
         ews_bias = "LONG"
-    elif ob_score <= 35 and btc_change_val < 0:
+    elif ob_bias == "SHORT" and momentum_bias == "SHORT":
         ews_bias = "SHORT"
+    elif ob_bias == "LONG" and btc_change > 0:
+        ews_bias = "LONG"
     else:
         ews_bias = "NEUTRAL"
+
+    sup = data.get("Sup_Wall", "-")
+    res = data.get("Res_Wall", "-")
 
     return {
         "score":      ews,
@@ -1518,7 +1851,9 @@ def _breadth(changes: list[float | None]) -> tuple[int, int]:
     return pos, len(valid)
 
 
-def _region_signal(score: float, breadth_pct: float) -> str:
+def _region_signal(score: float, breadth_pct: float, coverage_total: int = 1) -> str:
+    if coverage_total == 0:
+        return "UNKNOWN"
     if score >= 60 and breadth_pct >= 60:
         return "RISK ON"
     if score <= 40 or breadth_pct <= 35:
@@ -1530,6 +1865,14 @@ def _region_color(signal: str) -> str:
     return {"RISK ON": "positive", "NEUTRAL": "warning", "RISK OFF": "negative"}.get(signal, "warning")
 
 
+def _coverage_quality(coverage_score: int) -> str:
+    if coverage_score >= 95:
+        return "FULL"
+    if coverage_score >= 67:
+        return "PARTIAL"
+    return "THIN"
+
+
 def _build_region(
     name: str,
     assets: list[tuple[str, str, float]],   # (label, change_key, weight)
@@ -1539,35 +1882,43 @@ def _build_region(
     changes = [_pct(data.get(ck)) for _, ck, _ in assets]
     weights = [w for _, _, w in assets]
     pos, total = _breadth(changes)
-    brd_pct    = (pos / total * 100) if total else 0.0
-    score      = _weighted_change_score(changes, weights)
-    signal     = _region_signal(score, brd_pct)
+    brd_pct        = (pos / total * 100) if total else 0.0
+    coverage_ratio = total / len(assets) if assets else 0.0
+    score          = _weighted_change_score(changes, weights)
+    signal         = _region_signal(score, brd_pct, coverage_total=total)
 
-    # Değıişim değerlerini gösterim iin formatla
+    # Değişim değerlerini gösterim için formatla
     asset_rows = []
     for (lbl, ck, _), chg in zip(assets, changes):
         asset_rows.append({
-            "label":  lbl,
-            "key":    ck,
-            "change": f"{chg:+.2f}%" if chg is not None else "-",
-            "value":  chg,
-            "pos":    chg is not None and chg > 0,
+            "label":     lbl,
+            "key":       ck,
+            "change":    f"{chg:+.2f}%" if chg is not None else "-",
+            "value":     chg,
+            "pos":       chg is not None and chg > 0,
+            "risk_sign": 1,
         })
 
-    return {
-        "name":          name,
-        "score":         round(score, 1),
-        "weight":        region_weight,
-        "signal":        signal,
-        "color":         _region_color(signal),
-        "breadth_pos":   pos,
-        "breadth_total": total,
-        "breadth_pct":   round(brd_pct, 0),
-        "agree_pct":     round(brd_pct, 0),
-        "assets":        asset_rows,
-        "coverage":      f"{total}/{len(assets)}",
-    }
+    coverage_score_val = clamp_score(coverage_ratio * 100)
+    warnings: list[str] = []
+    if coverage_ratio < 0.67:
+        warnings.append(f"{name} coverage is low ({total}/{len(assets)}); signal reliability is reduced.")
 
+    return {
+        "name":           name,
+        "score":          round(score, 1),
+        "weight":         region_weight,
+        "signal":         signal,
+        "color":          _region_color(signal),
+        "breadth_pos":    pos,
+        "breadth_total":  total,
+        "breadth_pct":    round(brd_pct, 0),
+        "agree_pct":      round(brd_pct, 0),
+        "assets":         asset_rows,
+        "coverage":       f"{total}/{len(assets)}",
+        "coverage_score": coverage_score_val,
+        "warnings":       warnings,
+    }
 
 def _build_macro_stress_block(data: dict) -> dict:
     """
@@ -1682,6 +2033,15 @@ def build_risk_on_off(data: dict) -> dict:
 
     # ?? Global skor ???????????????????????????????????????????????????????????
     regions = [asia, europe, us, crypto]
+    # Bölgelere zenginleştirme alanları ekle (validation için gerekli)
+    for region in regions:
+        cov_score = int(region.get("coverage_score", 50))
+        conf_score = clamp_score((cov_score * 0.60) + (region.get("agree_pct", 50) * 0.40))
+        region["weight_pct"]      = int(round(region["weight"] * 100))
+        region["coverage_quality"] = _coverage_quality(cov_score)
+        region["confidence_score"] = conf_score
+        region["confidence_tier"]  = _confidence_tier(conf_score)
+
     global_score_raw = sum(
         r["score"] * r["weight"] for r in regions
     ) + macro_stress["score"] * macro_stress["weight"]
