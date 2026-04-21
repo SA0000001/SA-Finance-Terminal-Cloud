@@ -131,95 +131,156 @@ def _set_defaults(target: dict, defaults: dict):
     target.update(defaults)
 
 
+def _fetch_cnn_fng() -> int | None:
+    """
+    CNN Fear & Greed Index'i doğrudan CNN API'sinden çeker.
+    Başarılı olursa 0-100 arası integer döner, başarısız olursa None.
+    """
+    try:
+        resp = requests.get(
+            "https://production.dataviz.cnn.io/index/fearandgreed/graphdata",
+            headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                "Referer": "https://edition.cnn.com/markets/fear-and-greed",
+                "Accept": "application/json",
+            },
+            timeout=8,
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            score = data.get("fear_and_greed", {}).get("score")
+            if score is not None:
+                return int(round(float(score)))
+    except Exception:
+        pass
+    return None
+
+
 def _compute_stock_fng() -> dict:
     """
-    Stock Market Fear & Greed — CNN metodolojisine yakın 5 bileşenli composite.
-    CNN API sandbox ortamından erişilemediği için yfinance ile hesaplanır.
+    Stock Market Fear & Greed — CNN API öncelikli, yfinance fallback.
 
-    Bileşenler:
-      1. VIX seviyesi       (%25) — 12=tamam, 20=nötr, 40+=panik
-      2. SPX momentum       (%20) — 125 günlük MA'ya göre spread
-      3. Market breadth     (%20) — RSP/SPY (equal-weight/cap-weight spread)
-      4. Put/Call proxy     (%20) — VIX/VXN oranı (yaklaşık)
-      5. Safe haven demand  (%15) — TLT vs SPY 5g relatif performans
+    CNN API çalışırsa doğrudan resmi skoru kullanır.
+    Çalışmazsa CNN metodolojisine yakın 7 bileşenli yfinance hesabı:
+      1. Market Momentum     (%14.3) — SPX vs 125d MA
+      2. Stock Strength      (%14.3) — 52-week high/low oranı (RSP proxy)
+      3. Stock Breadth       (%14.3) — RSP/SPY equal-weight spread
+      4. Put/Call Ratio      (%14.3) — VIX/VXST oranı (short-term fear proxy)
+      5. Market Volatility   (%14.3) — VIX seviyesi
+      6. Safe Haven Demand   (%14.3) — TLT vs SPY relatif perf
+      7. Junk Bond Demand    (%14.3) — HYG vs LQD spread (yield proxy)
     """
     import numpy as np
 
+    def _label(s: int) -> str:
+        if s >= 75: return "Extreme Greed"
+        if s >= 55: return "Greed"
+        if s >= 45: return "Neutral"
+        if s >= 25: return "Fear"
+        return "Extreme Fear"
+
+    # --- 1. CNN API dene ---
+    cnn_score = _fetch_cnn_fng()
+    if cnn_score is not None:
+        return {
+            "STOCK_FNG_NUM":   cnn_score,
+            "STOCK_FNG":       f"{cnn_score} ({_label(cnn_score)})",
+            "STOCK_FNG_LABEL": _label(cnn_score),
+            "STOCK_FNG_VIX":   0,
+            "STOCK_FNG_MOM":   0,
+            "STOCK_FNG_BRD":   0,
+            "STOCK_FNG_SOURCE": "CNN",
+        }
+
+    # --- 2. yfinance fallback — CNN metodolojisine yakın hesap ---
     try:
         tickers = yf.download(
-            ["^VIX", "^GSPC", "^NDX", "SPY", "RSP", "TLT"],
+            ["^VIX", "^GSPC", "SPY", "RSP", "TLT", "HYG", "LQD"],
             period="130d", interval="1d", progress=False, auto_adjust=True,
         )
         close = tickers["Close"]
 
-        # 1. VIX bileşeni — düşük VIX = greedy
-        vix = close["^VIX"].dropna()
-        vix_now = float(vix.iloc[-1])
-        # 12→100, 20→50, 40→0
-        vix_score = max(0, min(100, int(100 - (vix_now - 12) / (40 - 12) * 100)))
-
-        # 2. SPX momentum — 125d MA'ya spread
+        # 1. Market Momentum — SPX vs 125d MA
         spx = close["^GSPC"].dropna()
         ma125 = float(spx.rolling(125).mean().iloc[-1])
         spx_now = float(spx.iloc[-1])
         spread_pct = (spx_now - ma125) / ma125 * 100  # -10%→0, 0%→50, +10%→100
         momentum_score = max(0, min(100, int(50 + spread_pct * 5)))
 
-        # 3. Breadth — RSP vs SPY 20g performans
+        # 2. Stock Price Strength — RSP 52-week high/low proximity proxy
         rsp = close["RSP"].dropna()
+        rsp_now = float(rsp.iloc[-1])
+        rsp_52h = float(rsp.iloc[-min(252, len(rsp)):].max())
+        rsp_52l = float(rsp.iloc[-min(252, len(rsp)):].min())
+        if rsp_52h > rsp_52l:
+            strength_score = max(0, min(100, int((rsp_now - rsp_52l) / (rsp_52h - rsp_52l) * 100)))
+        else:
+            strength_score = 50
+
+        # 3. Stock Price Breadth — RSP vs SPY 20g relatif performans
         spy = close["SPY"].dropna()
         rsp_ret = float(rsp.iloc[-1] / rsp.iloc[-20] - 1) * 100
         spy_ret = float(spy.iloc[-1] / spy.iloc[-20] - 1) * 100
-        breadth_spread = rsp_ret - spy_ret  # RSP outperform → greedy
+        breadth_spread = rsp_ret - spy_ret
         breadth_score = max(0, min(100, int(50 + breadth_spread * 10)))
 
-        # 4. Put/Call proxy — VIX/VXN (NDX vol / SPX vol oranı)
-        ndx_vix = close["^NDX"].dropna()
-        # NDX son 20 günün annualized return std
-        ndx_ret = ndx_vix.pct_change().dropna()
-        implied_vol_proxy = float(ndx_ret.iloc[-20:].std() * (252 ** 0.5) * 100)
-        # yüksek vol = korku
-        pcr_score = max(0, min(100, int(100 - (implied_vol_proxy - 10) / (50 - 10) * 100)))
+        # 4. Put/Call Ratio proxy — VIX seviyesi kısa vadeli (CNN: CBOE P/C ratio)
+        #    VIX yüksekse korku → düşük skor; VIX düşükse açgözlülük → yüksek skor
+        vix = close["^VIX"].dropna()
+        vix_now = float(vix.iloc[-1])
+        vix_ma20 = float(vix.rolling(20).mean().iloc[-1])
+        # VIX'in kendi 20g ortalamasına göre relatif konumu
+        vix_ratio = vix_now / vix_ma20 if vix_ma20 > 0 else 1.0
+        pcr_score = max(0, min(100, int(100 - (vix_ratio - 0.5) / (2.0 - 0.5) * 100)))
 
-        # 5. Safe haven — TLT vs SPY 5g relatif
+        # 5. Market Volatility — VIX seviyesi (12→100, 20→50, 40→0)
+        vix_score = max(0, min(100, int(100 - (vix_now - 12) / (40 - 12) * 100)))
+
+        # 6. Safe Haven Demand — TLT vs SPY 20g relatif (uzun vadeli)
         tlt = close["TLT"].dropna()
-        tlt_ret = float(tlt.iloc[-1] / tlt.iloc[-5] - 1) * 100
-        spy_ret5 = float(spy.iloc[-1] / spy.iloc[-5] - 1) * 100
-        safe_spread = tlt_ret - spy_ret5  # TLT outperform → fear
-        safe_score = max(0, min(100, int(50 - safe_spread * 8)))
+        tlt_ret = float(tlt.iloc[-1] / tlt.iloc[-20] - 1) * 100
+        spy_ret20 = float(spy.iloc[-1] / spy.iloc[-20] - 1) * 100
+        safe_spread = tlt_ret - spy_ret20  # TLT outperform → fear
+        safe_score = max(0, min(100, int(50 - safe_spread * 6)))
 
-        # Composite
-        composite = int(
-            vix_score      * 0.25 +
-            momentum_score * 0.20 +
-            breadth_score  * 0.20 +
-            pcr_score      * 0.20 +
-            safe_score     * 0.15
-        )
+        # 7. Junk Bond Demand — HYG vs LQD spread (CNN: high-yield vs investment grade)
+        hyg = close["HYG"].dropna()
+        lqd = close["LQD"].dropna()
+        hyg_ret = float(hyg.iloc[-1] / hyg.iloc[-20] - 1) * 100
+        lqd_ret = float(lqd.iloc[-1] / lqd.iloc[-20] - 1) * 100
+        junk_spread = hyg_ret - lqd_ret  # HYG outperform → greed
+        junk_score = max(0, min(100, int(50 + junk_spread * 8)))
 
-        def _label(s: int) -> str:
-            if s >= 75: return "Extreme Greed"
-            if s >= 55: return "Greed"
-            if s >= 45: return "Neutral"
-            if s >= 25: return "Fear"
-            return "Extreme Fear"
+        # Composite — 7 eşit ağırlık (CNN metodolojisi)
+        weight = 1 / 7
+        composite = int(round(
+            momentum_score * weight +
+            strength_score * weight +
+            breadth_score  * weight +
+            pcr_score      * weight +
+            vix_score      * weight +
+            safe_score     * weight +
+            junk_score     * weight
+        ))
 
         return {
-            "STOCK_FNG_NUM":   composite,
-            "STOCK_FNG":       f"{composite} ({_label(composite)})",
-            "STOCK_FNG_LABEL": _label(composite),
-            "STOCK_FNG_VIX":   vix_score,
-            "STOCK_FNG_MOM":   momentum_score,
-            "STOCK_FNG_BRD":   breadth_score,
+            "STOCK_FNG_NUM":    composite,
+            "STOCK_FNG":        f"{composite} ({_label(composite)})",
+            "STOCK_FNG_LABEL":  _label(composite),
+            "STOCK_FNG_VIX":    vix_score,
+            "STOCK_FNG_MOM":    momentum_score,
+            "STOCK_FNG_BRD":    breadth_score,
+            "STOCK_FNG_SOURCE": "yfinance",
         }
     except Exception:
         return {
-            "STOCK_FNG_NUM":   0,
-            "STOCK_FNG":       PLACEHOLDER,
-            "STOCK_FNG_LABEL": PLACEHOLDER,
-            "STOCK_FNG_VIX":   0,
-            "STOCK_FNG_MOM":   0,
-            "STOCK_FNG_BRD":   0,
+            "STOCK_FNG_NUM":    0,
+            "STOCK_FNG":        PLACEHOLDER,
+            "STOCK_FNG_LABEL":  PLACEHOLDER,
+            "STOCK_FNG_VIX":    0,
+            "STOCK_FNG_MOM":    0,
+            "STOCK_FNG_BRD":    0,
+            "STOCK_FNG_SOURCE": "error",
         }
 
 
@@ -447,15 +508,25 @@ def _load_yfinance_etfs(target: dict, recorder: HealthRecorder):
 
 
 def _load_yfinance_change_group(
-    target: dict, recorder: HealthRecorder, source: str, symbols: dict[str, str], *, period: str, value_template: str
+    target: dict, recorder: HealthRecorder, source: str, symbols: dict[str, str], *, period: str, value_template: str,
+    fallback_symbols: dict[str, str] | None = None,
 ):
     started_at = time.perf_counter()
     failures = []
 
+    # Bazı semboller için daha uzun period gerekebilir (ör. CSI300 — Çin borsası kapanış saati farkı)
+    _long_period_keys = {"CSI300"}
+
     def fetch_symbol(key: str, sym: str):
-        history, _ = _history_with_latency(sym, period=period)
+        fetch_period = "10d" if key in _long_period_keys else period
+        history, _ = _history_with_latency(sym, period=fetch_period)
         if history.empty or len(history.index) < 2:
-            raise ValueError(f"{key} history is empty")
+            # Fallback ticker varsa dene
+            fallback_sym = (fallback_symbols or {}).get(key)
+            if fallback_sym:
+                history, _ = _history_with_latency(fallback_sym, period=fetch_period)
+            if history.empty or len(history.index) < 2:
+                raise ValueError(f"{key} history is empty")
 
         curr = float(history["Close"].iloc[-1])
         prev = float(history["Close"].iloc[-2])
@@ -993,6 +1064,7 @@ def _legacy_veri_motoru(fred_api_key=""):
         },
         period="5d",
         value_template="{value:,.2f}",
+        fallback_symbols={"CSI300": "3188.HK"},
     )
 
     _load_yfinance_change_group(
@@ -1533,6 +1605,7 @@ def _fetch_market_snapshot():
             },
             period="5d",
             value_template="{value:,.2f}",
+            fallback_symbols={"CSI300": "3188.HK"},
         ),
         "commodities": lambda: _load_yfinance_change_group(
             data,
