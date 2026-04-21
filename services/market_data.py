@@ -514,8 +514,8 @@ def _load_yfinance_change_group(
     started_at = time.perf_counter()
     failures = []
 
-    # Bazı semboller için daha uzun period gerekebilir (ör. CSI300 — Çin borsası kapanış saati farkı)
-    _long_period_keys = {"CSI300"}
+    # Bazı semboller için daha uzun period gerekebilir
+    _long_period_keys: set[str] = set()
 
     def fetch_symbol(key: str, sym: str):
         fetch_period = "10d" if key in _long_period_keys else period
@@ -1058,13 +1058,12 @@ def _legacy_veri_motoru(fred_api_key=""):
             "FTSE": "^FTSE",
             "NIKKEI": "^N225",
             "HSI": "^HSI",
-            "CSI300": "000300.SS",
+            "SHCOMP": "000001.SS",
             "BIST100": "XU100.IS",
             "VIX": "^VIX",
         },
         period="5d",
         value_template="{value:,.2f}",
-        fallback_symbols={"CSI300": "3188.HK"},
     )
 
     _load_yfinance_change_group(
@@ -1599,13 +1598,12 @@ def _fetch_market_snapshot():
                 "FTSE": "^FTSE",
                 "NIKKEI": "^N225",
                 "HSI": "^HSI",
-                "CSI300": "000300.SS",
+                "SHCOMP": "000001.SS",
                 "BIST100": "XU100.IS",
                 "VIX": "^VIX",
             },
             period="5d",
             value_template="{value:,.2f}",
-            fallback_symbols={"CSI300": "3188.HK"},
         ),
         "commodities": lambda: _load_yfinance_change_group(
             data,
