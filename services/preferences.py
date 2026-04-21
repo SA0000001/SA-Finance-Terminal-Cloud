@@ -11,7 +11,7 @@ DEFAULT_PREFERENCES = {
         "funding_above": 0.01,
         "vix_above": 25.0,
         "etf_flow_below": 0.0,
-        "dxy_above": 105.0,
+        "dxy_above": 103.0,
     },
     "report_depth": "Orta",
 }

@@ -1,3 +1,4 @@
+import math
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -507,33 +508,43 @@ def _load_yfinance_etfs(target: dict, recorder: HealthRecorder):
         recorder.failure(source, "; ".join(failures) or "No ETF data", latency)
 
 
+def _symbol_candidates(symbol):
+    """Tek ticker veya (primary, fallback, ...) tuple — her ikisini de destekler."""
+    if isinstance(symbol, (list, tuple)):
+        return tuple(symbol)
+    return (symbol,)
+
+
 def _load_yfinance_change_group(
-    target: dict, recorder: HealthRecorder, source: str, symbols: dict[str, str], *, period: str, value_template: str,
-    fallback_symbols: dict[str, str] | None = None,
+    target: dict, recorder: HealthRecorder, source: str, symbols: dict[str, object], *, period: str, value_template: str
 ):
     started_at = time.perf_counter()
     failures = []
 
-    # Bazı semboller için daha uzun period gerekebilir
-    _long_period_keys: set[str] = set()
+    def fetch_symbol(key: str, sym):
+        errors = []
+        for candidate in _symbol_candidates(sym):
+            try:
+                history, _ = _history_with_latency(candidate, period=period)
+                if history.empty or "Close" not in history:
+                    raise ValueError(f"{candidate} history is empty")
 
-    def fetch_symbol(key: str, sym: str):
-        fetch_period = "10d" if key in _long_period_keys else period
-        history, _ = _history_with_latency(sym, period=fetch_period)
-        if history.empty or len(history.index) < 2:
-            # Fallback ticker varsa dene
-            fallback_sym = (fallback_symbols or {}).get(key)
-            if fallback_sym:
-                history, _ = _history_with_latency(fallback_sym, period=fetch_period)
-            if history.empty or len(history.index) < 2:
-                raise ValueError(f"{key} history is empty")
+                closes = history["Close"].dropna()
+                if len(closes.index) < 2:
+                    raise ValueError(f"{candidate} close history has fewer than 2 valid points")
 
-        curr = float(history["Close"].iloc[-1])
-        prev = float(history["Close"].iloc[-2])
-        return {
-            key: value_template.format(value=curr),
-            f"{key}_C": f"{(curr - prev) / prev * 100:.2f}%",
-        }
+                curr = float(closes.iloc[-1])
+                prev = float(closes.iloc[-2])
+                if not math.isfinite(curr) or not math.isfinite(prev) or prev == 0:
+                    raise ValueError(f"{candidate} close history has invalid values")
+
+                return {
+                    key: value_template.format(value=curr),
+                    f"{key}_C": f"{(curr - prev) / prev * 100:.2f}%",
+                }
+            except YFINANCE_EXCEPTIONS as exc:
+                errors.append(f"{candidate}: {exc}")
+        raise ValueError("; ".join(errors) or f"{key} history is invalid")
 
     successes = 0
     with ThreadPoolExecutor(max_workers=min(6, len(symbols))) as executor:
@@ -1058,11 +1069,11 @@ def _legacy_veri_motoru(fred_api_key=""):
             "FTSE": "^FTSE",
             "NIKKEI": "^N225",
             "HSI": "^HSI",
-            "SHCOMP": "000001.SS",
+            "SHCOMP": ("000001.SS", "^SSEC"),
             "BIST100": "XU100.IS",
             "VIX": "^VIX",
         },
-        period="5d",
+        period="10d",
         value_template="{value:,.2f}",
     )
 
@@ -1598,11 +1609,11 @@ def _fetch_market_snapshot():
                 "FTSE": "^FTSE",
                 "NIKKEI": "^N225",
                 "HSI": "^HSI",
-                "SHCOMP": "000001.SS",
+                "SHCOMP": ("000001.SS", "^SSEC"),
                 "BIST100": "XU100.IS",
                 "VIX": "^VIX",
             },
-            period="5d",
+            period="10d",
             value_template="{value:,.2f}",
         ),
         "commodities": lambda: _load_yfinance_change_group(
