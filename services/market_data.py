@@ -1546,10 +1546,11 @@ def _legacy_veri_motoru(fred_api_key=""):
         payload = blockchain_response.payload
         data["Hash"] = f"{payload['hash_rate']/1e9:.2f} EH/s"
         data["Active"] = f"{payload['n_unique_addresses']:,}"
+        data["BlockCount"] = f"{payload['n_blocks_mined']:,}"
         health.success("Blockchain Stats", blockchain_response.latency_ms, stale_after_seconds=3600)
     except FetchError as exc:
         _record_fetch_error(health, "Blockchain Stats", exc, stale_after_seconds=3600)
-        _set_defaults(data, {"Hash": PLACEHOLDER, "Active": PLACEHOLDER})
+        _set_defaults(data, {"Hash": PLACEHOLDER, "Active": PLACEHOLDER, "BlockCount": PLACEHOLDER})
     except DATA_PARSE_EXCEPTIONS as exc:
         _record_parse_error(
             health,
@@ -2131,7 +2132,7 @@ def _fetch_onchain_snapshot():
         payload = response.payload
         data["Hash"] = f"{payload['hash_rate']/1e9:.2f} EH/s"
         data["Active"] = f"{payload['n_unique_addresses']:,}"
-        health.success("Blockchain Stats", response.latency_ms, stale_after_seconds=3600)
+        data["BlockCount"] = f"{payload['n_blocks_mined']:,}"
     except FetchError as exc:
         _record_fetch_error(health, "Blockchain Stats", exc, stale_after_seconds=3600)
         _set_defaults(data, {"Hash": PLACEHOLDER, "Active": PLACEHOLDER})
@@ -2337,6 +2338,17 @@ def load_terminal_data(fred_api_key=""):
     data = _merge_result_payloads(*normalized_payloads)
     if data.get("Total_Stable_Num") and data.get("TOTAL_CAP_NUM"):
         data["STABLE_C_D"] = f"%{data['Total_Stable_Num']/data['TOTAL_CAP_NUM']*100:.2f}"
+    # OI Notional: oiCcy (BTC) * BTC fiyatı → $B
+    try:
+        oi_btc = float(str(data.get("OI", "")).replace(",", "").replace(" BTC", "").strip())
+        btc_price = float(str(data.get("BTC_P", "")).replace("$", "").replace(",", "").strip())
+        if oi_btc > 0 and btc_price > 0:
+            notional_b = oi_btc * btc_price / 1e9
+            data["OI_NOTIONAL"] = f"${notional_b:.2f}B"
+        else:
+            data["OI_NOTIONAL"] = PLACEHOLDER
+    except (ValueError, TypeError):
+        data["OI_NOTIONAL"] = PLACEHOLDER
     return data
 
 
