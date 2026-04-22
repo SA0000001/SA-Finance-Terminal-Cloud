@@ -195,7 +195,7 @@ def build_data_table_card_html(title: str, rows, kicker: str = "", caption: str 
         )
 
     if show_delta:
-        head = "<div class='dc-grid-head dc-grid-head-delta'><span>Metrik</span><span>Deger</span><span>Gunluk %</span></div>"
+        head = "<div class='dc-grid-head dc-grid-head-delta'><span>Metrik</span><span>Deger</span><span>%</span></div>"
         body = "".join(
             f"<div class='dc-row dc-row-delta'>"
             f"<div class='dc-key'>{esc(label)}{_context_html(label)}</div>"

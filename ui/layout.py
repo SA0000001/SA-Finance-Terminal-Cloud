@@ -122,7 +122,16 @@ def render_page_header(last_updated: str, health_summary: dict, brief: dict, pre
 # ??? STATUS HUB ??????????????????????????????????????????????????????????????
 
 def render_status_hub(last_updated: str, health_summary: dict, alerts: list[dict], analytics: dict):
-    issue_rows  = [r for r in health_summary.get("rows", []) if r.get("Durum") != "OK"]
+    _TV_FALLBACK_SOURCES = {
+        "TradingView Commodities",
+        "TradingView FX",
+        "TradingView Indices",
+    }
+    issue_rows  = [
+        r for r in health_summary.get("rows", [])
+        if r.get("Durum") != "OK"
+        and normalize_health_cell(r.get("Kaynak")) not in _TV_FALLBACK_SOURCES
+    ]
     scores      = analytics["scores"]
     issue_count = len(issue_rows)
     alert_count = len(alerts)
@@ -284,7 +293,16 @@ def render_sidebar(data, brief, last_updated: str, health_summary: dict, prefere
         # ?? Operasyon Merkezi (status hub) ????????????????????????????????????
         scores      = (analytics or {}).get("scores", {})
         confidence  = scores.get("confidence", "-") if scores else "-"
-        issue_rows  = [r for r in health_summary.get("rows", []) if r.get("Durum") != "OK"]
+        _TV_FALLBACK_SOURCES = {
+            "TradingView Commodities",
+            "TradingView FX",
+            "TradingView Indices",
+        }
+        issue_rows  = [
+            r for r in health_summary.get("rows", [])
+            if r.get("Durum") != "OK"
+            and normalize_health_cell(r.get("Kaynak")) not in _TV_FALLBACK_SOURCES
+        ]
         issue_count = len(issue_rows)
         alert_count = len(alerts)
 
