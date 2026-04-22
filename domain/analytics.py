@@ -473,7 +473,7 @@ def _build_positioning_factor(data: dict) -> dict:
         {
             "label": "Open interest",
             "display": _display(data.get("OI")),
-            "score": _linear_score(open_interest, 150_000, 600_000, inverse=True),
+            "score": _linear_score(open_interest, 20_000, 80_000, inverse=True),
             "weight": 0.16,
         },
         {
