@@ -375,7 +375,7 @@ def _compute_stock_fng() -> dict:
 
     def _label(s: int) -> str:
         if s >= 75: return "Extreme Greed"
-        if s >= 55: return "Greed"
+        if s >= 56: return "Greed"
         if s >= 45: return "Neutral"
         if s >= 25: return "Fear"
         return "Extreme Fear"
@@ -1205,12 +1205,10 @@ def _legacy_veri_motoru(fred_api_key=""):
             headers=HEADERS,
         )
         dom_val = float(data["Dom"].replace("%", "")) if data.get("Dom") != PLACEHOLDER else 0
-        btc_mc = (
-            float(data["BTC_MCap"].replace("$", "").replace("B", "")) * 1e9
-            if data.get("BTC_MCap") != PLACEHOLDER
-            else 0
+        total_mc = float(data["Total_MCap_Num"]) if data.get("Total_MCap_Num") else (
+            float(data["BTC_MCap"].replace("$", "").replace("B", "")) * 1e9 / (dom_val / 100)
+            if dom_val > 0 and data.get("BTC_MCap") != PLACEHOLDER else 0
         )
-        total_mc = btc_mc / (dom_val / 100) if dom_val > 0 else 0
         if total_mc > 0:
             eth_market_cap = float(eth_dom_response.payload["quotes"]["USD"]["market_cap"])
             data["ETH_Dom"] = f"%{eth_market_cap/total_mc*100:.2f}"
@@ -1547,7 +1545,7 @@ def _legacy_veri_motoru(fred_api_key=""):
         )
         payload = blockchain_response.payload
         data["Hash"] = f"{payload['hash_rate']/1e9:.2f} EH/s"
-        data["Active"] = f"{payload['n_blocks_mined']*2100:,}"
+        data["Active"] = f"{payload['n_unique_addresses']:,}"
         health.success("Blockchain Stats", blockchain_response.latency_ms, stale_after_seconds=3600)
     except FetchError as exc:
         _record_fetch_error(health, "Blockchain Stats", exc, stale_after_seconds=3600)
@@ -1800,12 +1798,10 @@ def _fetch_market_snapshot():
             headers=HEADERS,
         )
         dom_val = float(data["Dom"].replace("%", "")) if data.get("Dom") != PLACEHOLDER else 0
-        btc_mc = (
-            float(data["BTC_MCap"].replace("$", "").replace("B", "")) * 1e9
-            if data.get("BTC_MCap") != PLACEHOLDER
-            else 0
+        total_mc = float(data["Total_MCap_Num"]) if data.get("Total_MCap_Num") else (
+            float(data["BTC_MCap"].replace("$", "").replace("B", "")) * 1e9 / (dom_val / 100)
+            if dom_val > 0 and data.get("BTC_MCap") != PLACEHOLDER else 0
         )
-        total_mc = btc_mc / (dom_val / 100) if dom_val > 0 else 0
         if total_mc > 0:
             data["ETH_Dom"] = f"%{float(eth_dom_response.payload['quotes']['USD']['market_cap'])/total_mc*100:.2f}"
         else:
@@ -2134,7 +2130,7 @@ def _fetch_onchain_snapshot():
         response = safe_fetch_json("Blockchain Stats", "https://api.blockchain.info/stats", timeout=5, headers=HEADERS)
         payload = response.payload
         data["Hash"] = f"{payload['hash_rate']/1e9:.2f} EH/s"
-        data["Active"] = f"{payload['n_blocks_mined']*2100:,}"
+        data["Active"] = f"{payload['n_unique_addresses']:,}"
         health.success("Blockchain Stats", response.latency_ms, stale_after_seconds=3600)
     except FetchError as exc:
         _record_fetch_error(health, "Blockchain Stats", exc, stale_after_seconds=3600)
@@ -2317,8 +2313,9 @@ def veri_motoru(fred_api_key=""):
     data.setdefault("LS_Signal", PLACEHOLDER)
     data.setdefault("ECONOMIC_CALENDAR", [])
     data.setdefault("ECONOMIC_CALENDAR_SOURCE", PLACEHOLDER)
-    if data.get("Total_Stable_Num") and data.get("Total_MCap_Num"):
-        data["STABLE_C_D"] = f"%{data['Total_Stable_Num']/data['Total_MCap_Num']*100:.2f}"
+    # NOTE: STABLE_C_D final computation is done in load_terminal_data using
+    # TOTAL_CAP_NUM (TradingView/CoinGecko) which is more accurate than
+    # Coinpaprika Total_MCap_Num. Do not compute here to avoid silent override confusion.
     return data
 
 
@@ -2379,7 +2376,7 @@ def turev_cek():
             timeout=6,
             headers=HEADERS,
         )
-        data["OI"] = f"{float(open_interest_response.payload['data'][0]['oi']):,.0f} BTC"
+        data["OI"] = f"{float(open_interest_response.payload['data'][0]['oiCcy']):,.2f} BTC"
         health.success("OKX Open Interest", open_interest_response.latency_ms, stale_after_seconds=300)
     except FetchError as exc:
         _record_fetch_error(health, "OKX Open Interest", exc, stale_after_seconds=300)
@@ -2444,7 +2441,7 @@ def turev_cek():
             data["LS_Ratio"] = f"{ratio:.3f}"
             data["Long_Pct"] = f"%{long_pct:.1f}"
             data["Short_Pct"] = f"%{short_pct:.1f}"
-            data["LS_Signal"] = "Long agirlikli" if ratio > 1 else "Short agirlikli"
+            data["LS_Signal"] = "Long ağırlıklı" if ratio > 1 else "Short ağırlıklı"
             health.success("OKX Long/Short", ls_response.latency_ms, stale_after_seconds=300)
             ls_done = True
             break
@@ -2473,7 +2470,7 @@ def turev_cek():
             data["LS_Ratio"] = f"{ratio:.3f}"
             data["Long_Pct"] = f"%{long_pct:.1f}"
             data["Short_Pct"] = f"%{100-long_pct:.1f}"
-            data["LS_Signal"] = "Long agirlikli" if ratio > 1 else "Short agirlikli"
+            data["LS_Signal"] = "Long ağırlıklı" if ratio > 1 else "Short ağırlıklı"
             health.success("Gate.io Long/Short", gate_response.latency_ms, stale_after_seconds=300)
             ls_done = True
         except FetchError as exc:
