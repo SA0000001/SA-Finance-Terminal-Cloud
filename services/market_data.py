@@ -1535,32 +1535,6 @@ def _legacy_veri_motoru(fred_api_key=""):
         health.failure("FRED M2", "FRED_API_KEY missing", stale_after_seconds=21600)
         health.failure("FRED FEDFUNDS", "FRED_API_KEY missing", stale_after_seconds=21600)
 
-    blockchain_response = None
-    try:
-        blockchain_response = safe_fetch_json(
-            "Blockchain Stats",
-            "https://api.blockchain.info/stats",
-            timeout=5,
-            headers=HEADERS,
-        )
-        payload = blockchain_response.payload
-        data["Hash"] = f"{payload['hash_rate']/1e9:.2f} EH/s"
-        data["Active"] = f"{payload['n_unique_addresses']:,}"
-        data["BlockCount"] = f"{payload['n_blocks_mined']:,}"
-        health.success("Blockchain Stats", blockchain_response.latency_ms, stale_after_seconds=3600)
-    except FetchError as exc:
-        _record_fetch_error(health, "Blockchain Stats", exc, stale_after_seconds=3600)
-        _set_defaults(data, {"Hash": PLACEHOLDER, "Active": PLACEHOLDER, "BlockCount": PLACEHOLDER})
-    except DATA_PARSE_EXCEPTIONS as exc:
-        _record_parse_error(
-            health,
-            "Blockchain Stats",
-            exc,
-            latency_ms=blockchain_response.latency_ms if blockchain_response else None,
-            stale_after_seconds=3600,
-        )
-        _set_defaults(data, {"Hash": PLACEHOLDER, "Active": PLACEHOLDER, "BlockCount": PLACEHOLDER})
-
     fng_response = None
     try:
         fng_response = safe_fetch_json(
@@ -2124,29 +2098,8 @@ def _fetch_macro_snapshot(fred_api_key=""):
 
 @_cache_data_headless_safe(ttl=3600)
 def _fetch_onchain_snapshot():
-    data = {}
-    health = HealthRecorder()
-    response = None
-    try:
-        response = safe_fetch_json("Blockchain Stats", "https://api.blockchain.info/stats", timeout=5, headers=HEADERS)
-        payload = response.payload
-        data["Hash"] = f"{payload['hash_rate']/1e9:.2f} EH/s"
-        data["Active"] = f"{payload['n_unique_addresses']:,}"
-        data["BlockCount"] = f"{payload['n_blocks_mined']:,}"
-    except FetchError as exc:
-        _record_fetch_error(health, "Blockchain Stats", exc, stale_after_seconds=3600)
-        _set_defaults(data, {"Hash": PLACEHOLDER, "Active": PLACEHOLDER, "BlockCount": PLACEHOLDER})
-    except DATA_PARSE_EXCEPTIONS as exc:
-        _record_parse_error(
-            health,
-            "Blockchain Stats",
-            exc,
-            latency_ms=response.latency_ms if response else None,
-            stale_after_seconds=3600,
-        )
-        _set_defaults(data, {"Hash": PLACEHOLDER, "Active": PLACEHOLDER, "BlockCount": PLACEHOLDER})
-    data["_health"] = health.export()
-    return data
+    # blockchain.info erişim sorunu (403) — veri kaynağı devre dışı
+    return {"_health": HealthRecorder().export()}
 
 
 @_cache_data_headless_safe(ttl=SENTIMENT_TTL)
@@ -2312,7 +2265,6 @@ def veri_motoru(fred_api_key=""):
     data.setdefault("Long_Pct", PLACEHOLDER)
     data.setdefault("Short_Pct", PLACEHOLDER)
     data.setdefault("LS_Signal", PLACEHOLDER)
-    data.setdefault("BlockCount", PLACEHOLDER)
     data.setdefault("OI_NOTIONAL", PLACEHOLDER)
     data.setdefault("ECONOMIC_CALENDAR", [])
     data.setdefault("ECONOMIC_CALENDAR_SOURCE", PLACEHOLDER)
