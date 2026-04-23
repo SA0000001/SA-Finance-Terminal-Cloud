@@ -188,6 +188,13 @@ def _format_error_for_display(source: str, error: str | None) -> str:
     return text
 
 
+_TV_FALLBACK_SOURCES = {
+    "TradingView Commodities",
+    "TradingView FX",
+    "TradingView Indices",
+}
+
+
 def build_health_summary(health_state: dict[str, dict]) -> dict:
     entries = []
     stale_sources = []
@@ -201,7 +208,13 @@ def build_health_summary(health_state: dict[str, dict]) -> dict:
             stale_sources.append(source)
         elif not entry.get("ok"):
             status = "FAIL"
-            failed_sources.append(source)
+            # TV fallback'lar yfinance ile karşılanıyor; sorun sayılmaz
+            if source not in _TV_FALLBACK_SOURCES:
+                failed_sources.append(source)
+
+        # TV fallback FAIL satırlarını tablodan da gizle
+        if status == "FAIL" and source in _TV_FALLBACK_SOURCES:
+            continue
 
         entries.append(
             {

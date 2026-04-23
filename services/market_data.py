@@ -1559,7 +1559,7 @@ def _legacy_veri_motoru(fred_api_key=""):
             latency_ms=blockchain_response.latency_ms if blockchain_response else None,
             stale_after_seconds=3600,
         )
-        _set_defaults(data, {"Hash": PLACEHOLDER, "Active": PLACEHOLDER})
+        _set_defaults(data, {"Hash": PLACEHOLDER, "Active": PLACEHOLDER, "BlockCount": PLACEHOLDER})
 
     fng_response = None
     try:
@@ -2135,7 +2135,7 @@ def _fetch_onchain_snapshot():
         data["BlockCount"] = f"{payload['n_blocks_mined']:,}"
     except FetchError as exc:
         _record_fetch_error(health, "Blockchain Stats", exc, stale_after_seconds=3600)
-        _set_defaults(data, {"Hash": PLACEHOLDER, "Active": PLACEHOLDER})
+        _set_defaults(data, {"Hash": PLACEHOLDER, "Active": PLACEHOLDER, "BlockCount": PLACEHOLDER})
     except DATA_PARSE_EXCEPTIONS as exc:
         _record_parse_error(
             health,
@@ -2144,7 +2144,7 @@ def _fetch_onchain_snapshot():
             latency_ms=response.latency_ms if response else None,
             stale_after_seconds=3600,
         )
-        _set_defaults(data, {"Hash": PLACEHOLDER, "Active": PLACEHOLDER})
+        _set_defaults(data, {"Hash": PLACEHOLDER, "Active": PLACEHOLDER, "BlockCount": PLACEHOLDER})
     data["_health"] = health.export()
     return data
 
@@ -2312,6 +2312,8 @@ def veri_motoru(fred_api_key=""):
     data.setdefault("Long_Pct", PLACEHOLDER)
     data.setdefault("Short_Pct", PLACEHOLDER)
     data.setdefault("LS_Signal", PLACEHOLDER)
+    data.setdefault("BlockCount", PLACEHOLDER)
+    data.setdefault("OI_NOTIONAL", PLACEHOLDER)
     data.setdefault("ECONOMIC_CALENDAR", [])
     data.setdefault("ECONOMIC_CALENDAR_SOURCE", PLACEHOLDER)
     # NOTE: STABLE_C_D final computation is done in load_terminal_data using
