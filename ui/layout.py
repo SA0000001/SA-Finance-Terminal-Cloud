@@ -244,7 +244,7 @@ def _render_sidebar_preferences():
         etf_flow      = st.number_input("ETF netflow < Z", value=float(thresholds.get("etf_flow_below", 0.0)), step=10.0,  format="%.1f", key="sidebar_thr_etf")
         dxy_above     = st.number_input("DXY > W",         value=float(thresholds.get("dxy_above", 105.0)),    step=0.5,   format="%.2f", key="sidebar_thr_dxy")
 
-        if st.button("Ayarlar? Kaydet", key="sidebar_pref_save", use_container_width=True):
+        if st.button("Ayarları Kaydet", key="sidebar_pref_save", use_container_width=True):
             prefs["view_mode"]      = view_mode
             prefs["report_depth"]   = report_depth
             prefs["pinned_metrics"] = pinned_metrics[:8]
