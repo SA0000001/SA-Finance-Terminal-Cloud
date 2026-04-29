@@ -663,6 +663,21 @@ def parse_tradingview_market_cap(text):
     return value * multiplier
 
 
+def parse_tradingview_dominance(text):
+    """TradingView CRYPTOCAP:BTC.D / ETH.D sayfasından dominance yüzdesini parse eder.
+    Örnek: 'Market open 57.27% R' → 57.27
+    """
+    match = re.search(r"Market open\s+([0-9]+(?:\.[0-9]+)?)%\s*R", text)
+    if not match:
+        match = re.search(r"Market closed\s+([0-9]+(?:\.[0-9]+)?)%\s*R", text)
+    if not match:
+        # Alternatif format: "57.27% R USD"
+        match = re.search(r"([0-9]+(?:\.[0-9]+)?)%\s*R\s*USD", text)
+    if not match:
+        raise ValueError("tradingview dominance not found")
+    return float(match.group(1))
+
+
 def _load_yfinance_etfs(target: dict, recorder: HealthRecorder):
     source = "yFinance ETFs"
     started_at = time.perf_counter()
@@ -932,11 +947,17 @@ def fetch_live_usdt_d():
 @_cache_data_headless_safe(ttl=FAST_TTL)
 def fetch_live_market_cap_segments():
     health = HealthRecorder()
-    symbols = {
+    # Market cap sembolleri (parse_tradingview_market_cap kullanır)
+    cap_symbols = {
         "TOTAL": "https://r.jina.ai/http://www.tradingview.com/symbols/TOTAL/",
         "TOTAL2": "https://r.jina.ai/http://www.tradingview.com/symbols/TOTAL2/",
         "TOTAL3": "https://r.jina.ai/http://www.tradingview.com/symbols/TOTAL3/",
         "OTHERS": "https://r.jina.ai/http://www.tradingview.com/symbols/OTHERS/?exchange=CRYPTOCAP",
+    }
+    # Dominance sembolleri (parse_tradingview_dominance kullanır)
+    dom_symbols = {
+        "BTC_D": "https://r.jina.ai/http://www.tradingview.com/symbols/BTC.D/?exchange=CRYPTOCAP",
+        "ETH_D": "https://r.jina.ai/http://www.tradingview.com/symbols/ETH.D/?exchange=CRYPTOCAP",
     }
     result = {
         "TOTAL_CAP": PLACEHOLDER,
@@ -948,34 +969,55 @@ def fetch_live_market_cap_segments():
         "TOTAL3_CAP_NUM": None,
         "OTHERS_CAP_NUM": None,
         "TOTAL_CAP_SOURCE": PLACEHOLDER,
+        # FIX 1: TradingView'dan doğrudan dominance değerleri
+        "BTC_DOM_TV": PLACEHOLDER,
+        "ETH_DOM_TV": PLACEHOLDER,
+        "DOM_SOURCE": PLACEHOLDER,
     }
 
     tradingview_started_at = time.perf_counter()
     tradingview_parsed = {}
+    dom_parsed = {}
     tradingview_failures = []
-    with ThreadPoolExecutor(max_workers=min(4, len(symbols))) as executor:
+
+    all_fetches = {
+        **{k: (k, "cap", url) for k, url in cap_symbols.items()},
+        **{k: (k, "dom", url) for k, url in dom_symbols.items()},
+    }
+
+    with ThreadPoolExecutor(max_workers=min(6, len(all_fetches))) as executor:
         future_map = {
             executor.submit(
                 lambda key=key, url=url: (
                     key,
                     safe_fetch_text("TradingView Market Cap", url, timeout=20, headers=HEADERS, accept=TEXT_ACCEPT),
                 )
-            ): key
-            for key, url in symbols.items()
+            ): (key, ftype)
+            for key, (_, ftype, url) in all_fetches.items()
         }
         for future in as_completed(future_map):
-            key = future_map[future]
+            key, ftype = future_map[future]
             try:
                 _, response = future.result()
-                tradingview_parsed[key] = parse_tradingview_market_cap(response.payload)
+                if ftype == "cap":
+                    tradingview_parsed[key] = parse_tradingview_market_cap(response.payload)
+                else:
+                    dom_parsed[key] = parse_tradingview_dominance(response.payload)
             except FetchError as exc:
                 tradingview_failures.append(str(exc))
             except (TypeError, ValueError) as exc:
                 tradingview_failures.append(_error_message("Parse error", exc))
 
-    if len(tradingview_parsed) == len(symbols):
+    # Dominance değerlerini kaydet (cap başarısız olsa bile)
+    if "BTC_D" in dom_parsed:
+        result["BTC_DOM_TV"] = f"%{dom_parsed['BTC_D']:.2f}"
+        result["DOM_SOURCE"] = "TradingView"
+    if "ETH_D" in dom_parsed:
+        result["ETH_DOM_TV"] = f"%{dom_parsed['ETH_D']:.2f}"
+
+    if len(tradingview_parsed) == len(cap_symbols):
         latency = _latency_ms(tradingview_started_at)
-        result = {
+        result.update({
             "TOTAL_CAP": format_market_cap_short(tradingview_parsed["TOTAL"]),
             "TOTAL2_CAP": format_market_cap_short(tradingview_parsed["TOTAL2"]),
             "TOTAL3_CAP": format_market_cap_short(tradingview_parsed["TOTAL3"]),
@@ -985,7 +1027,7 @@ def fetch_live_market_cap_segments():
             "TOTAL3_CAP_NUM": tradingview_parsed["TOTAL3"],
             "OTHERS_CAP_NUM": tradingview_parsed["OTHERS"],
             "TOTAL_CAP_SOURCE": "TradingView",
-        }
+        })
         health.success("TradingView Market Cap", latency, stale_after_seconds=300)
         result["_health"] = health.export()
         return result
@@ -1970,7 +2012,7 @@ def _fetch_orderbook_snapshot():
     return data
 
 
-@_cache_data_headless_safe(ttl=MACRO_TTL)
+@_cache_data_headless_safe(ttl=MARKET_TTL)  # FIX 4: 6 saat (MACRO_TTL) → 5 dakika (MARKET_TTL)
 def _fetch_stablecoin_snapshot():
     data = {}
     health = HealthRecorder()
@@ -1999,9 +2041,9 @@ def _fetch_stablecoin_snapshot():
         data["DAI_MCap"] = f"${dai_cap/1e9:.1f}B"
         data["USDT_Dom_Stable"] = f"%{usdt_cap/total*100:.1f}" if total > 0 else PLACEHOLDER
         data["STABLE_C_D"] = PLACEHOLDER
-        health.success("DeFiLlama Stablecoins", stablecoin_response.latency_ms, stale_after_seconds=21600)
+        health.success("DeFiLlama Stablecoins", stablecoin_response.latency_ms, stale_after_seconds=300)
     except FetchError as exc:
-        _record_fetch_error(health, "DeFiLlama Stablecoins", exc, stale_after_seconds=21600)
+        _record_fetch_error(health, "DeFiLlama Stablecoins", exc, stale_after_seconds=300)
         _set_defaults(
             data,
             {
@@ -2020,7 +2062,7 @@ def _fetch_stablecoin_snapshot():
             "DeFiLlama Stablecoins",
             exc,
             latency_ms=stablecoin_response.latency_ms if stablecoin_response else None,
-            stale_after_seconds=21600,
+            stale_after_seconds=300,
         )
         _set_defaults(
             data,
@@ -2290,8 +2332,24 @@ def load_terminal_data(fred_api_key=""):
         for task_name in ("base", "market_cap", "derivatives")
     ]
     data = _merge_result_payloads(*normalized_payloads)
+
+    # ── FIX 3: BTC.D / ETH.D → TradingView değerleriyle override ──────────────
+    # Coinpaprika'nın hesabı TradingView'dan 0.1–0.5% sapabilir.
+    # fetch_live_market_cap_segments'ten gelen BTC_DOM_TV / ETH_DOM_TV varsa öncelikli kullan.
+    if data.get("BTC_DOM_TV") and data["BTC_DOM_TV"] != PLACEHOLDER:
+        data["Dom"] = data["BTC_DOM_TV"]
+        data["DOM_SOURCE"] = "TradingView"
+    if data.get("ETH_DOM_TV") and data["ETH_DOM_TV"] != PLACEHOLDER:
+        data["ETH_Dom"] = data["ETH_DOM_TV"]
+
+    # ── FIX 4: STABLE_C_D → tutarlı kaynak ────────────────────────────────────
+    # DeFiLlama stable / TradingView TOTAL (her ikisi de aynı kaynak grubundan).
+    # USDT_D zaten fetch_live_usdt_d'den TradingView scrape ile geliyor;
+    # Stable.C.D için de TOTAL_CAP_NUM'u (TradingView) referans alıyoruz.
     if data.get("Total_Stable_Num") and data.get("TOTAL_CAP_NUM"):
         data["STABLE_C_D"] = f"%{data['Total_Stable_Num']/data['TOTAL_CAP_NUM']*100:.2f}"
+        data["STABLE_C_D_SOURCE"] = "DeFiLlama / TradingView TOTAL"
+
     # OI Notional: oiCcy (BTC) * BTC fiyatı → $B
     try:
         oi_btc = float(str(data.get("OI", "")).replace(",", "").replace(" BTC", "").strip())
