@@ -158,7 +158,7 @@ def _top_drivers(metrics: list[dict], count: int = 3) -> list[str]:
 
 def _factor_state(score: int) -> str:
     if score >= 75:
-        return "G—l destek"
+        return "Güçlü destek"
     if score >= 60:
         return "Yapıcı"
     if score >= 45:
