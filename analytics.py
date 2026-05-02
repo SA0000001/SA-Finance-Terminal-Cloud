@@ -204,25 +204,33 @@ def _regime_confidence_score(
         + (factors["liquidity"]["score"] * 0.12)
     )
 
-    weakest_penalty = max(0.0, (56 - weakest_factor["score"]) * 0.58)
-    fragility_penalty = max(0.0, (fragility["score"] - 22) * 0.56)
-    crowding_penalty = max(0.0, (62 - factors["positioning"]["score"]) * 0.44)
-    volatility_penalty = max(0.0, (60 - factors["volatility"]["score"]) * 0.26)
-    alignment_penalty = max(0.0, (alignment_gap - 12) * 0.45)
-    invalidate_penalty = max(0.0, len(invalidate_conditions) - 1) * 4.5
+    # --- Penalty sistemi (yumuşatılmış) ---
+    # weakest: eşik 52'ye indirildi (56'dan), katsayı 0.42 (0.58'den)
+    weakest_penalty = max(0.0, (52 - weakest_factor["score"]) * 0.42)
+    # fragility: tetik eşiği 28'e yükseltildi (22'den), katsayı 0.44 (0.56'dan)
+    fragility_penalty = max(0.0, (fragility["score"] - 28) * 0.44)
+    # crowding: eşik 55'e indirildi (62'den), katsayı 0.32 (0.44'ten)
+    crowding_penalty = max(0.0, (55 - factors["positioning"]["score"]) * 0.32)
+    # volatility: katsayı 0.20'ye indirildi (0.26'dan)
+    volatility_penalty = max(0.0, (60 - factors["volatility"]["score"]) * 0.20)
+    # alignment: eşik 16'ya yükseltildi (12'den), katsayı 0.32 (0.45'ten)
+    alignment_penalty = max(0.0, (alignment_gap - 16) * 0.32)
+    # invalidate: per-koşul ceza 3.0'a indirildi (4.5'ten)
+    invalidate_penalty = max(0.0, len(invalidate_conditions) - 1) * 3.0
+    # proximity: her eşik daha yüksek tetiklenecek, cezalar hafifletildi
     invalidate_proximity_penalty = 0.0
-    if factors["liquidity"]["score"] < 58:
-        invalidate_proximity_penalty += 3.0
-    if factors["volatility"]["score"] < 60:
-        invalidate_proximity_penalty += 3.0
-    if factors["positioning"]["score"] < 58:
-        invalidate_proximity_penalty += 4.0
-    if macro_breadth < 55:
-        invalidate_proximity_penalty += 2.0
-    if crypto_breadth < 55:
-        invalidate_proximity_penalty += 2.0
-    if alignment_gap >= 18:
-        invalidate_proximity_penalty += 2.5
+    if factors["liquidity"]["score"] < 48:      # 58 → 48
+        invalidate_proximity_penalty += 2.0     # 3.0 → 2.0
+    if factors["volatility"]["score"] < 50:     # 60 → 50
+        invalidate_proximity_penalty += 2.0     # 3.0 → 2.0
+    if factors["positioning"]["score"] < 48:    # 58 → 48
+        invalidate_proximity_penalty += 2.5     # 4.0 → 2.5
+    if macro_breadth < 45:                      # 55 → 45
+        invalidate_proximity_penalty += 1.5     # 2.0 → 1.5
+    if crypto_breadth < 45:                     # 55 → 45
+        invalidate_proximity_penalty += 1.5     # 2.0 → 1.5
+    if alignment_gap >= 22:                     # 18 → 22
+        invalidate_proximity_penalty += 2.0     # 2.5 → 2.0
 
     calibrated = (
         raw_score
@@ -235,21 +243,26 @@ def _regime_confidence_score(
         - invalidate_proximity_penalty
     )
 
+    # --- Cap sistemi (gevşetilmiş) ---
     cap = 84
     if overall < 72:
-        cap = 80
+        cap = 82                                # 80 → 82
     if overall < 62:
-        cap = 74
-    if weakest_factor["score"] < 56 or fragility["score"] >= 38:
-        cap = min(cap, 70)
-    if factors["positioning"]["score"] < 56 or alignment_gap >= 18:
-        cap = min(cap, 66)
-    if fragility["score"] >= 55 or factors["positioning"]["score"] < 48 or weakest_factor["score"] < 48:
+        cap = 78                                # 74 → 78
+    if weakest_factor["score"] < 52 or fragility["score"] >= 42:   # 56/38 → 52/42
+        cap = min(cap, 72)                      # 70 → 72
+    if factors["positioning"]["score"] < 52 or alignment_gap >= 22:  # 56/18 → 52/22
+        cap = min(cap, 68)                      # 66 → 68
+    if fragility["score"] >= 60 or factors["positioning"]["score"] < 44 or weakest_factor["score"] < 44:  # 55/48/48 → 60/44/44
         cap = min(cap, 58)
-    if fragility["score"] >= 70 or factors["positioning"]["score"] < 40 or weakest_factor["score"] < 40:
+    if fragility["score"] >= 75 or factors["positioning"]["score"] < 36 or weakest_factor["score"] < 36:  # 70/40/40 → 75/36/36
         cap = min(cap, 48)
 
-    return clamp_score(min(calibrated, cap))
+    # Minimum floor: hiçbir zaman 12'nin altına düşmesin
+    # (veri mevcutsa anlamsız "0-4" değerleri önlenir)
+    floor = 12 if data_confidence > 0 else 0
+
+    return max(floor, clamp_score(min(calibrated, cap)))
 
 
 def _regime_confidence_label(score: int, fragility_score: int) -> str:
