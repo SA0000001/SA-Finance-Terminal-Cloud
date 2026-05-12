@@ -31,7 +31,6 @@ from services.ai_service import (
 from services.health import build_health_summary, merge_source_health
 from services.market_data import load_terminal_data
 from services.preferences import load_preferences, save_preferences
-from services.hyperliquid import fetch_hl_whale_data, whale_summary_rows, fmt_usd_short
 from ui.components import (
     bi_label,
     cat,
@@ -1571,21 +1570,6 @@ with st.spinner("Piyasa verileri yükleniyor…"):
     current_health = merge_source_health(st.session_state.get("source_health"), data.pop("_health", {}))
     data["_health"] = current_health
     st.session_state["source_health"] = current_health
-
-# ── Hyperliquid balina verisi (bağımsız, hata toleranslı) ──────────────────────
-try:
-    hl_snap = fetch_hl_whale_data(coins=["BTC", "ETH", "SOL"])
-    # Analytics motoruna sayısal değer geç
-    data["HL_NET_BIAS_RAW"] = hl_snap.net_bias_usd
-    data["HL_NET_BIAS"]     = fmt_usd_short(hl_snap.net_bias_usd)
-    data["HL_WHALE_ALERT"]  = hl_snap.whale_alert or "Nötr"
-    data["HL_BIG_TRADES"]   = str(hl_snap.big_trade_count_1h)
-    data["HL_LONG_VOL"]     = fmt_usd_short(hl_snap.long_total_usd)
-    data["HL_SHORT_VOL"]    = fmt_usd_short(hl_snap.short_total_usd)
-except Exception as _hl_exc:
-    hl_snap = None
-    data.setdefault("HL_NET_BIAS_RAW", None)
-    data.setdefault("HL_WHALE_ALERT", "—")
 
 health_summary = build_health_summary(data.get("_health", {}))
 brief          = build_market_brief(data)
