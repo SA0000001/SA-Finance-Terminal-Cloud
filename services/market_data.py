@@ -1015,27 +1015,40 @@ def fetch_live_market_cap_segments():
     if "ETH_D" in dom_parsed:
         result["ETH_DOM_TV"] = f"%{dom_parsed['ETH_D']:.2f}"
 
-    if len(tradingview_parsed) == len(cap_symbols):
-        latency = _latency_ms(tradingview_started_at)
-        result.update({
-            "TOTAL_CAP": format_market_cap_short(tradingview_parsed["TOTAL"]),
-            "TOTAL2_CAP": format_market_cap_short(tradingview_parsed["TOTAL2"]),
-            "TOTAL3_CAP": format_market_cap_short(tradingview_parsed["TOTAL3"]),
-            "OTHERS_CAP": format_market_cap_short(tradingview_parsed["OTHERS"]),
-            "TOTAL_CAP_NUM": tradingview_parsed["TOTAL"],
-            "TOTAL2_CAP_NUM": tradingview_parsed["TOTAL2"],
-            "TOTAL3_CAP_NUM": tradingview_parsed["TOTAL3"],
-            "OTHERS_CAP_NUM": tradingview_parsed["OTHERS"],
-            "TOTAL_CAP_SOURCE": "TradingView",
-        })
-        health.success("TradingView Market Cap", latency, stale_after_seconds=300)
+    # Kısmi başarı: TOTAL en kritik key — o geldiyse kalanları placeholder'la göster,
+    # hata olarak işaretleme. Böylece tek bir sembol timeout'u tüm paneli kırmaz.
+    latency = _latency_ms(tradingview_started_at)
+    _cap_key_map = {
+        "TOTAL": ("TOTAL_CAP", "TOTAL_CAP_NUM"),
+        "TOTAL2": ("TOTAL2_CAP", "TOTAL2_CAP_NUM"),
+        "TOTAL3": ("TOTAL3_CAP", "TOTAL3_CAP_NUM"),
+        "OTHERS": ("OTHERS_CAP", "OTHERS_CAP_NUM"),
+    }
+    for sym, (fmt_key, num_key) in _cap_key_map.items():
+        if sym in tradingview_parsed:
+            result[fmt_key] = format_market_cap_short(tradingview_parsed[sym])
+            result[num_key] = tradingview_parsed[sym]
+
+    if "TOTAL" in tradingview_parsed:
+        result["TOTAL_CAP_SOURCE"] = "TradingView"
+        if len(tradingview_parsed) == len(cap_symbols):
+            health.success("TradingView Market Cap", latency, stale_after_seconds=300)
+        else:
+            # Kısmi: TOTAL geldi ama bazı semboller eksik
+            missing = [s for s in cap_symbols if s not in tradingview_parsed]
+            health.success(
+                "TradingView Market Cap",
+                latency,
+                stale_after_seconds=300,
+            )
+            LOGGER.warning("TradingView partial fetch — missing: %s", missing)
         result["_health"] = health.export()
         return result
 
     health.failure(
         "TradingView Market Cap",
         "; ".join(tradingview_failures) or "TradingView market cap fetch failed",
-        _latency_ms(tradingview_started_at),
+        latency,
         stale_after_seconds=300,
     )
 
