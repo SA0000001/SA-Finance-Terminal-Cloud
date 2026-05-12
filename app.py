@@ -74,7 +74,7 @@ MACRO_MARKET_SECTIONS = [
 ]
 
 FLOW_RISK_SECTIONS = [
-    {"title": "Türev & Sentiment",      "kicker": "Positioning",       "caption": "", "rows": [("Open Interest (BTC)","OI"),("OI Notional","OI_NOTIONAL"),("Funding Rate","FR"),("Taker B/S","Taker"),("L/S Oranı","LS_Ratio"),("Long %","Long_Pct"),("Short %","Short_Pct"),("L/S Sinyal","LS_Signal"),("Crypto F&G","FNG"),("FNG Dün","FNG_PREV"),("Stock F&G","STOCK_FNG"),("── HL Balina ──",""),("HL Net Bias","HL_NET_BIAS"),("HL Long Hacim","HL_LONG_VOL"),("HL Short Hacim","HL_SHORT_VOL"),("HL Büyük İşlem (1s)","HL_BIG_TRADES"),("HL Sinyal","HL_WHALE_ALERT")]},
+    {"title": "Türev & Sentiment",      "kicker": "Positioning",       "caption": "", "rows": [("Open Interest (BTC)","OI"),("OI Notional","OI_NOTIONAL"),("Funding Rate","FR"),("Taker B/S","Taker"),("L/S Oranı","LS_Ratio"),("Long %","Long_Pct"),("Short %","Short_Pct"),("L/S Sinyal","LS_Signal"),("Crypto F&G","FNG"),("FNG Dün","FNG_PREV"),("Stock F&G","STOCK_FNG")]},
     {"title": "Order Book & ETF",        "kicker": "Execution Levels",  "caption": "", "rows": [("Destek Duvarı","Sup_Wall"),("Destek Hacmi","Sup_Vol"),("Direnç Duvarı","Res_Wall"),("Direnç Hacmi","Res_Vol"),("Tahta Durumu","Wall_Status"),("Birleşik Sinyal","ORDERBOOK_SIGNAL"),("Birleşik Detay","ORDERBOOK_SIGNAL_DETAIL"),("ETF Netflow","ETF_FLOW_TOTAL"),("ETF Tarih","ETF_FLOW_DATE"),("Kaynaklar","ORDERBOOK_SOURCES")]},
     {"title": "Stablecoin & On-Chain",   "kicker": "Liquidity Plumbing","caption": "", "rows": [("Toplam Stable","Total_Stable"),("USDT","USDT_MCap"),("USDC","USDC_MCap"),("DAI","DAI_MCap"),("Stable.C.D","STABLE_C_D"),("USDT.D","USDT_D"),("USDT Dom Stable","USDT_Dom_Stable")]},
     {"title": "Crypto Participation",    "kicker": "Breadth Layers",    "caption": "", "rows": [("TOTAL","TOTAL_CAP"),("TOTAL2","TOTAL2_CAP"),("TOTAL3","TOTAL3_CAP"),("OTHERS","OTHERS_CAP"),("BTC Dom","Dom"),("ETH Dom","ETH_Dom")]},
@@ -83,7 +83,7 @@ FLOW_RISK_SECTIONS = [
 
 DATA_ATLAS_SECTIONS = [
     {"title": "BTC & Kripto",         "rows": [("BTC Fiyatı","BTC_P"),("BTC 24s","BTC_C"),("BTC 7g","BTC_7D"),("BTC MCap","BTC_MCap"),("24s Hacim","Vol_24h"),("BTC Dom","Dom"),("ETH Dom","ETH_Dom"),("Total MCap","TOTAL_CAP"),("Total Hacim","Total_Vol")]},
-    {"title": "Türev & Sentiment",    "rows": [("OI (BTC)","OI"),("OI Notional","OI_NOTIONAL"),("Funding Rate","FR"),("Taker B/S","Taker"),("L/S Oranı","LS_Ratio"),("Long %","Long_Pct"),("Short %","Short_Pct"),("L/S Sinyal","LS_Signal"),("Crypto F&G","FNG"),("FNG Dün","FNG_PREV"),("Stock F&G","STOCK_FNG"),("── HL Balina ──",""),("HL Net Bias","HL_NET_BIAS"),("HL Long Hacim","HL_LONG_VOL"),("HL Short Hacim","HL_SHORT_VOL"),("HL Büyük İşlem (1s)","HL_BIG_TRADES"),("HL Sinyal","HL_WHALE_ALERT")]},
+    {"title": "Türev & Sentiment",    "rows": [("OI (BTC)","OI"),("OI Notional","OI_NOTIONAL"),("Funding Rate","FR"),("Taker B/S","Taker"),("L/S Oranı","LS_Ratio"),("Long %","Long_Pct"),("Short %","Short_Pct"),("L/S Sinyal","LS_Signal"),("Crypto F&G","FNG"),("FNG Dün","FNG_PREV"),("Stock F&G","STOCK_FNG")]},
     {"title": "Order Book & ETF",     "rows": [("Destek Duvarı","Sup_Wall"),("Destek Hacmi","Sup_Vol"),("Direnç Duvarı","Res_Wall"),("Direnç Hacmi","Res_Vol"),("Tahta","Wall_Status"),("Sinyal","ORDERBOOK_SIGNAL"),("Detay","ORDERBOOK_SIGNAL_DETAIL"),("Kaynaklar","ORDERBOOK_SOURCES"),("ETF Netflow","ETF_FLOW_TOTAL"),("ETF Tarih","ETF_FLOW_DATE")]},
     {"title": "Crypto Participation", "rows": [("TOTAL","TOTAL_CAP"),("TOTAL2","TOTAL2_CAP"),("TOTAL3","TOTAL3_CAP"),("OTHERS","OTHERS_CAP"),("BTC Dom","Dom"),("ETH Dom","ETH_Dom")]},
     {"title": "Stablecoin & On-Chain","rows": [("Toplam Stable","Total_Stable"),("USDT","USDT_MCap"),("USDC","USDC_MCap"),("DAI","DAI_MCap"),("Stable.C.D","STABLE_C_D"),("USDT.D","USDT_D"),("USDT Dom Stable","USDT_Dom_Stable")]},
@@ -888,10 +888,10 @@ def render_overview_tab(data, brief, analytics, alerts, health_summary):
         dt, _ = score_delta_meta(f["delta_7d"])
         render_signal_deck(
             "Positioning Deck", brief["positioning"]["title"], f["summary"],
-            [("Funding", data.get("FR","-")), ("L/S", data.get("LS_Ratio","-")), ("Taker", data.get("Taker","-")), ("HL Bias", data.get("HL_NET_BIAS","—")), ("HL Sinyal", data.get("HL_WHALE_ALERT","—"))],
+            [("Funding", data.get("FR","-")), ("L/S", data.get("LS_Ratio","-")), ("Taker", data.get("Taker","-"))],
             score_value=f"{f['score']}/100", score_label=f["confidence_label"],
             chips=[f["state"], f"Weight {f['weight_pct']}%", dt, f["primary_risk"]],
-            context_rows=[("Crowding", f["state"]), ("Driver", f["primary_support"]), ("Weakest", f["primary_risk"]), ("HL Balina", data.get("HL_WHALE_ALERT","—"))],
+            context_rows=[("Crowding", f["state"]), ("Driver", f["primary_support"]), ("Weakest", f["primary_risk"])],
             emphasis=pos_band, emphasis_kind=pos_kind,
         )
     with d3:
