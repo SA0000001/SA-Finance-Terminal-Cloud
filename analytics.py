@@ -33,6 +33,8 @@ METRIC_LABELS = {
     "DXY": "DXY",
     "FED": "FED",
     "CSI300": "CSI 300",
+    "HL_NET_BIAS": "HL Net Bias",
+    "HL_WHALE_ALERT": "HL Balina",
 }
 
 # Metrik başvuru eşikleri — data table card'larda bağlam notu olarak gösterilir
@@ -52,6 +54,8 @@ METRIC_CONTEXT: dict[str, str] = {
     "Dom":             "BTC Dom artışı: altcoin riskten kaçış. Düşüş: altcoin sezonuna geçiş sinyali.",
     "ETH_Dom":         "ETH dom güçleniyorsa ETH liderliği; zayıflıyorsa BTC veya altcoin rotasyonu.",
     "LS_Ratio":        "L/S >1: uzun pozisyon ağırlıklı. <1: short ağırlıklı. Aşırı uçlar dikkat sinyali.",
+    "HL_NET_BIAS":     "Hyperliquid büyük pozisyonların net yönü. Pozitif = balina long, negatif = balina short.",
+    "HL_WHALE_ALERT":  "Net bias $2M eşiğini aşınca tetiklenir. Tek başına sinyal değil, FR ve L/S ile birlikte okunmalı.",
     "Sup_Wall":        "Mevcut fiyatın altındaki en güçlü alım duvarı seviyesi.",
     "Res_Wall":        "Mevcut fiyatın üstündeki en güçlü satış duvarı seviyesi.",
     "Hash":            "Hashrate artışı madenci güvenini ve ağ sağlığını gösterir.",
@@ -418,44 +422,73 @@ def _build_positioning_factor(data: dict) -> dict:
     btc_change = parse_number(data.get("BTC_C"))
     etf_flow = parse_number(data.get("ETF_FLOW_TOTAL"))
 
+    # HL Balina: net_bias_usd (pozitif=long, negatif=short)
+    # data'ya sayısal olarak konulur: HL_NET_BIAS_RAW (USD)
+    hl_net_raw = parse_number(data.get("HL_NET_BIAS_RAW"))  # $M cinsinden ham değer
+    # Skora çevir: -5M → 10, 0 → 50, +5M → 90 (extreme long da dikkat sinyali değil burada)
+    # Aşırı tek yön balonlanmasını düşük skorla cezalandır
+    def _hl_bias_score(net_usd: float | None) -> int:
+        if net_usd is None:
+            return 50
+        # $10M üzeri tek yön = aşırı kalabalık → ceza
+        clamped = max(-10_000_000, min(10_000_000, net_usd))
+        # Nötr bölge (±2M) = 50±10; aşırı long = 35 (crowded); aşırı short = 65 (squeeze riski yok)
+        normalized = clamped / 10_000_000  # -1 ile +1 arası
+        # Long-bias yüksek = crowded long → positioning skoru düşer
+        score = 50 - (normalized * 20)
+        return clamp_score(score)
+
+    hl_bias_score = _hl_bias_score(hl_net_raw)
+
     divergence_score = 80
     if (btc_change or 0) > 0 and (etf_flow or 0) < 0:
         divergence_score = 28
     elif (btc_change or 0) < 0 and (etf_flow or 0) > 0:
         divergence_score = 62
 
+    # HL verisi varsa ağırlığı dağıt; yoksa mevcut ağırlıkları koru
+    has_hl = hl_net_raw is not None
     metrics = [
         {
             "label": "Funding dengesi",
             "display": _display(data.get("FR")),
             "score": _balance_score(funding, 0.0, 0.006, 0.03),
-            "weight": 0.30,
+            "weight": 0.28 if has_hl else 0.30,
         },
         {
             "label": "L/S dengesi",
             "display": _display(data.get("LS_Ratio")),
             "score": _balance_score(ls_ratio, 1.0, 0.10, 0.55),
-            "weight": 0.24,
+            "weight": 0.22 if has_hl else 0.24,
         },
         {
             "label": "Taker akis",
             "display": _display(data.get("Taker")),
             "score": _balance_score(taker, 1.0, 0.05, 0.30),
-            "weight": 0.20,
+            "weight": 0.18 if has_hl else 0.20,
         },
         {
             "label": "Open interest",
             "display": _display(data.get("OI")),
             "score": _linear_score(open_interest, 1_800_000, 3_800_000, inverse=True),
-            "weight": 0.16,
+            "weight": 0.14 if has_hl else 0.16,
         },
         {
             "label": "Fiyat-akis uyumu",
             "display": f"BTC { _display(data.get('BTC_C')) } | ETF { _display(data.get('ETF_FLOW_TOTAL')) }",
             "score": divergence_score,
-            "weight": 0.10,
+            "weight": 0.08 if has_hl else 0.10,
         },
     ]
+    # HL Balina metriği — sadece veri varsa eklenir
+    if has_hl:
+        hl_display = data.get("HL_NET_BIAS", "—")
+        metrics.append({
+            "label": "HL Balina Baskısı",
+            "display": str(hl_display),
+            "score": hl_bias_score,
+            "weight": 0.10,
+        })
     score = _weighted_metric_score(metrics)
     crowding_pressure = clamp_score(
         100
