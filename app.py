@@ -31,6 +31,7 @@ from services.ai_service import (
 from services.health import build_health_summary, merge_source_health
 from services.market_data import load_terminal_data
 from services.preferences import load_preferences, save_preferences
+from services.hyperliquid import fetch_hl_whale_data, whale_summary_rows, fmt_usd_short
 from ui.components import (
     bi_label,
     cat,
@@ -74,7 +75,7 @@ MACRO_MARKET_SECTIONS = [
 ]
 
 FLOW_RISK_SECTIONS = [
-    {"title": "Türev & Sentiment",      "kicker": "Positioning",       "caption": "", "rows": [("Open Interest (BTC)","OI"),("OI Notional","OI_NOTIONAL"),("Funding Rate","FR"),("Taker B/S","Taker"),("L/S Oranı","LS_Ratio"),("Long %","Long_Pct"),("Short %","Short_Pct"),("L/S Sinyal","LS_Signal"),("Crypto F&G","FNG"),("FNG Dün","FNG_PREV"),("Stock F&G","STOCK_FNG")]},
+    {"title": "Türev & Sentiment",      "kicker": "Positioning",       "caption": "", "rows": [("Open Interest (BTC)","OI"),("OI Notional","OI_NOTIONAL"),("Funding Rate","FR"),("Taker B/S","Taker"),("L/S Oranı","LS_Ratio"),("Long %","Long_Pct"),("Short %","Short_Pct"),("L/S Sinyal","LS_Signal"),("Crypto F&G","FNG"),("FNG Dün","FNG_PREV"),("Stock F&G","STOCK_FNG"),("── HL Balina ──",""),("HL Net Bias","HL_NET_BIAS"),("HL Long Hacim","HL_LONG_VOL"),("HL Short Hacim","HL_SHORT_VOL"),("HL Büyük İşlem (1s)","HL_BIG_TRADES"),("HL Sinyal","HL_WHALE_ALERT")]},
     {"title": "Order Book & ETF",        "kicker": "Execution Levels",  "caption": "", "rows": [("Destek Duvarı","Sup_Wall"),("Destek Hacmi","Sup_Vol"),("Direnç Duvarı","Res_Wall"),("Direnç Hacmi","Res_Vol"),("Tahta Durumu","Wall_Status"),("Birleşik Sinyal","ORDERBOOK_SIGNAL"),("Birleşik Detay","ORDERBOOK_SIGNAL_DETAIL"),("ETF Netflow","ETF_FLOW_TOTAL"),("ETF Tarih","ETF_FLOW_DATE"),("Kaynaklar","ORDERBOOK_SOURCES")]},
     {"title": "Stablecoin & On-Chain",   "kicker": "Liquidity Plumbing","caption": "", "rows": [("Toplam Stable","Total_Stable"),("USDT","USDT_MCap"),("USDC","USDC_MCap"),("DAI","DAI_MCap"),("Stable.C.D","STABLE_C_D"),("USDT.D","USDT_D"),("USDT Dom Stable","USDT_Dom_Stable")]},
     {"title": "Crypto Participation",    "kicker": "Breadth Layers",    "caption": "", "rows": [("TOTAL","TOTAL_CAP"),("TOTAL2","TOTAL2_CAP"),("TOTAL3","TOTAL3_CAP"),("OTHERS","OTHERS_CAP"),("BTC Dom","Dom"),("ETH Dom","ETH_Dom")]},
@@ -83,7 +84,7 @@ FLOW_RISK_SECTIONS = [
 
 DATA_ATLAS_SECTIONS = [
     {"title": "BTC & Kripto",         "rows": [("BTC Fiyatı","BTC_P"),("BTC 24s","BTC_C"),("BTC 7g","BTC_7D"),("BTC MCap","BTC_MCap"),("24s Hacim","Vol_24h"),("BTC Dom","Dom"),("ETH Dom","ETH_Dom"),("Total MCap","TOTAL_CAP"),("Total Hacim","Total_Vol")]},
-    {"title": "Türev & Sentiment",    "rows": [("OI (BTC)","OI"),("OI Notional","OI_NOTIONAL"),("Funding Rate","FR"),("Taker B/S","Taker"),("L/S Oranı","LS_Ratio"),("Long %","Long_Pct"),("Short %","Short_Pct"),("L/S Sinyal","LS_Signal"),("Crypto F&G","FNG"),("FNG Dün","FNG_PREV"),("Stock F&G","STOCK_FNG")]},
+    {"title": "Türev & Sentiment",    "rows": [("OI (BTC)","OI"),("OI Notional","OI_NOTIONAL"),("Funding Rate","FR"),("Taker B/S","Taker"),("L/S Oranı","LS_Ratio"),("Long %","Long_Pct"),("Short %","Short_Pct"),("L/S Sinyal","LS_Signal"),("Crypto F&G","FNG"),("FNG Dün","FNG_PREV"),("Stock F&G","STOCK_FNG"),("── HL Balina ──",""),("HL Net Bias","HL_NET_BIAS"),("HL Long Hacim","HL_LONG_VOL"),("HL Short Hacim","HL_SHORT_VOL"),("HL Büyük İşlem (1s)","HL_BIG_TRADES"),("HL Sinyal","HL_WHALE_ALERT")]},
     {"title": "Order Book & ETF",     "rows": [("Destek Duvarı","Sup_Wall"),("Destek Hacmi","Sup_Vol"),("Direnç Duvarı","Res_Wall"),("Direnç Hacmi","Res_Vol"),("Tahta","Wall_Status"),("Sinyal","ORDERBOOK_SIGNAL"),("Detay","ORDERBOOK_SIGNAL_DETAIL"),("Kaynaklar","ORDERBOOK_SOURCES"),("ETF Netflow","ETF_FLOW_TOTAL"),("ETF Tarih","ETF_FLOW_DATE")]},
     {"title": "Crypto Participation", "rows": [("TOTAL","TOTAL_CAP"),("TOTAL2","TOTAL2_CAP"),("TOTAL3","TOTAL3_CAP"),("OTHERS","OTHERS_CAP"),("BTC Dom","Dom"),("ETH Dom","ETH_Dom")]},
     {"title": "Stablecoin & On-Chain","rows": [("Toplam Stable","Total_Stable"),("USDT","USDT_MCap"),("USDC","USDC_MCap"),("DAI","DAI_MCap"),("Stable.C.D","STABLE_C_D"),("USDT.D","USDT_D"),("USDT Dom Stable","USDT_Dom_Stable")]},
@@ -888,10 +889,10 @@ def render_overview_tab(data, brief, analytics, alerts, health_summary):
         dt, _ = score_delta_meta(f["delta_7d"])
         render_signal_deck(
             "Positioning Deck", brief["positioning"]["title"], f["summary"],
-            [("Funding", data.get("FR","-")), ("L/S", data.get("LS_Ratio","-")), ("Taker", data.get("Taker","-"))],
+            [("Funding", data.get("FR","-")), ("L/S", data.get("LS_Ratio","-")), ("Taker", data.get("Taker","-")), ("HL Bias", data.get("HL_NET_BIAS","—")), ("HL Sinyal", data.get("HL_WHALE_ALERT","—"))],
             score_value=f"{f['score']}/100", score_label=f["confidence_label"],
             chips=[f["state"], f"Weight {f['weight_pct']}%", dt, f["primary_risk"]],
-            context_rows=[("Crowding", f["state"]), ("Driver", f["primary_support"]), ("Weakest", f["primary_risk"])],
+            context_rows=[("Crowding", f["state"]), ("Driver", f["primary_support"]), ("Weakest", f["primary_risk"]), ("HL Balina", data.get("HL_WHALE_ALERT","—"))],
             emphasis=pos_band, emphasis_kind=pos_kind,
         )
     with d3:
@@ -1570,6 +1571,21 @@ with st.spinner("Piyasa verileri yükleniyor…"):
     current_health = merge_source_health(st.session_state.get("source_health"), data.pop("_health", {}))
     data["_health"] = current_health
     st.session_state["source_health"] = current_health
+
+# ── Hyperliquid balina verisi (bağımsız, hata toleranslı) ──────────────────────
+try:
+    hl_snap = fetch_hl_whale_data(coins=["BTC", "ETH", "SOL"])
+    # Analytics motoruna sayısal değer geç
+    data["HL_NET_BIAS_RAW"] = hl_snap.net_bias_usd
+    data["HL_NET_BIAS"]     = fmt_usd_short(hl_snap.net_bias_usd)
+    data["HL_WHALE_ALERT"]  = hl_snap.whale_alert or "Nötr"
+    data["HL_BIG_TRADES"]   = str(hl_snap.big_trade_count_1h)
+    data["HL_LONG_VOL"]     = fmt_usd_short(hl_snap.long_total_usd)
+    data["HL_SHORT_VOL"]    = fmt_usd_short(hl_snap.short_total_usd)
+except Exception as _hl_exc:
+    hl_snap = None
+    data.setdefault("HL_NET_BIAS_RAW", None)
+    data.setdefault("HL_WHALE_ALERT", "—")
 
 health_summary = build_health_summary(data.get("_health", {}))
 brief          = build_market_brief(data)
