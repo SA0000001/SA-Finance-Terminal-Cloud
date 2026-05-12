@@ -33,8 +33,6 @@ METRIC_LABELS = {
     "SOL_P": "SOL fiyat",
     "DXY": "DXY",
     "FED": "FED",
-    "HL_NET_BIAS": "HL Net Bias",
-    "HL_WHALE_ALERT": "HL Balina",
 }
 
 # Metrik başvuru eşikleri — data table card'larda bağlam notu olarak gsterilir
@@ -54,8 +52,6 @@ METRIC_CONTEXT: dict[str, str] = {
     "Dom":             "BTC Dom artışı: altcoin riskten kaçış. Düşüş: altcoin sezonuna geçiş sinyali.",
     "ETH_Dom":         "ETH dom güçleniyorsa ETH liderliği; zayıflıyorsa BTC veya altcoin rotasyonu.",
     "LS_Ratio":        "L/S >1: uzun pozisyon ağırlıklı. <1: short ağırlıklı. Aşırı uçlar dikkat sinyali.",
-    "HL_NET_BIAS":     "Hyperliquid büyük pozisyonların net yönü. Pozitif = balina long, negatif = balina short.",
-    "HL_WHALE_ALERT":  "Net bias $2M eşiğini aşınca tetiklenir. FR ve L/S ile birlikte okunmalı.",
     "TOTAL_CAP":       "Tüm kripto piyasa değeri. Yeni ATH yaklaşımı geniş katılımı gösterir.",
     "TOTAL2_CAP":      "BTC hariç kripto piyasa değeri. Altcoin sezonu göstergesi.",
     "TOTAL3_CAP":      "BTC ve ETH hariç. Küçük/orta cap katılımını ölçer.",
@@ -444,19 +440,6 @@ def _build_positioning_factor(data: dict) -> dict:
     btc_change = parse_number(data.get("BTC_C"))
     etf_flow = parse_number(data.get("ETF_FLOW_TOTAL"))
 
-    # HL Balina: net_bias_usd (pozitif=long, negatif=short)
-    hl_net_raw = parse_number(data.get("HL_NET_BIAS_RAW"))
-
-    def _hl_bias_score(net_usd: float | None) -> int:
-        if net_usd is None:
-            return 50
-        clamped = max(-10_000_000, min(10_000_000, net_usd))
-        normalized = clamped / 10_000_000
-        score = 50 - (normalized * 20)
-        return clamp_score(score)
-
-    hl_bias_score = _hl_bias_score(hl_net_raw)
-
     divergence_score = 62  # default: nötr-pozitif
     if etf_flow is None:
         divergence_score = 50  # veri yok, nötr
@@ -469,46 +452,38 @@ def _build_positioning_factor(data: dict) -> dict:
     elif (btc_change or 0) < 0 and etf_flow < 0:
         divergence_score = 22  # BTC aşağı + ETF çıkışı: bearish uyum
 
-    has_hl = hl_net_raw is not None
     metrics = [
         {
             "label": "Funding dengesi",
             "display": _display(data.get("FR")),
             "score": _balance_score(funding, 0.0, 0.006, 0.03),
-            "weight": 0.28 if has_hl else 0.30,
+            "weight": 0.30,
         },
         {
             "label": "L/S dengesi",
             "display": _display(data.get("LS_Ratio")),
             "score": _balance_score(ls_ratio, 1.0, 0.10, 0.55),
-            "weight": 0.22 if has_hl else 0.24,
+            "weight": 0.24,
         },
         {
             "label": "Taker akis",
             "display": _display(data.get("Taker")),
             "score": _balance_score(taker, 1.0, 0.05, 0.30),
-            "weight": 0.18 if has_hl else 0.20,
+            "weight": 0.20,
         },
         {
             "label": "Open interest",
             "display": _display(data.get("OI")),
             "score": _linear_score(open_interest, 20_000, 80_000, inverse=True),
-            "weight": 0.14 if has_hl else 0.16,
+            "weight": 0.16,
         },
         {
             "label": "Fiyat-akis uyumu",
             "display": f"BTC { _display(data.get('BTC_C')) } | ETF { _display(data.get('ETF_FLOW_TOTAL')) }",
             "score": divergence_score,
-            "weight": 0.08 if has_hl else 0.10,
+            "weight": 0.10,
         },
     ]
-    if has_hl:
-        metrics.append({
-            "label": "HL Balina Baskısı",
-            "display": str(data.get("HL_NET_BIAS", "—")),
-            "score": hl_bias_score,
-            "weight": 0.10,
-        })
     score = _weighted_metric_score(metrics)
     crowding_pressure = clamp_score(
         100
