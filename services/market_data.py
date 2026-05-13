@@ -520,7 +520,11 @@ def _normalize_calendar_events(events, now=None):
         if parsed is None:
             continue
 
-        if today <= parsed.date() <= horizon:
+        event_date = parsed.date()
+        # Bugüne ait geçmiş saatli olayları da dahil et (actual değerlerini göstermek için)
+        # Kural: (bugün içindeki herhangi bir saat) VEYA (yarınki olaylar horizon'a kadar)
+        in_window = (event_date == today) or (today < event_date <= horizon)
+        if in_window:
             normalized.append(
                 {
                     "title": title or PLACEHOLDER,
