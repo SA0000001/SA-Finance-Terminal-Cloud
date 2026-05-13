@@ -60,14 +60,23 @@ def _format_health(health_summary: dict) -> str:
 def _format_calendar(calendar_events: list[dict]) -> str:
     if not calendar_events:
         return "- Calendar unavailable"
-    return "\n".join(
-        (
-            f"- {_safe(event.get('date'))} {_safe(event.get('time'))} | {_safe(event.get('country'))} | "
-            f"{_safe(event.get('impact'))} | {_safe(event.get('title'))} | "
-            f"A:{_safe(event.get('actual'))} F:{_safe(event.get('forecast'))} P:{_safe(event.get('previous'))}"
+    lines = []
+    for event in calendar_events[:5]:
+        actual = (event.get("actual") or "").strip()
+        forecast = _safe(event.get("forecast"))
+        previous = _safe(event.get("previous"))
+        # Açıklanan değer geldiyse "Açıklanan" etiketi; yoksa "Henüz açıklanmadı"
+        has_actual = actual and actual not in ("—", "-", "")
+        if has_actual:
+            result_str = f"Açıklanan:{actual} | Beklenti:{forecast} | Önceki:{previous} | [AÇIKLANDI]"
+        else:
+            result_str = f"Beklenti:{forecast} | Önceki:{previous} | [HENÜZ AÇIKLANMADI]"
+        lines.append(
+            f"- {_safe(event.get('date'))} {_safe(event.get('time'))} | "
+            f"{_safe(event.get('country'))} | {_safe(event.get('impact'))} | "
+            f"{_safe(event.get('title'))} | {result_str}"
         )
-        for event in calendar_events[:3]
-    )
+    return "\n".join(lines)
 
 
 def _format_brief(brief: dict) -> str:
@@ -354,4 +363,6 @@ Ek kurallar:
 - "Günlük Harita ve Ana Çıkarım" bolumunde MQS ve EWS skorlarini karar algilamasina bagla: piyasa kalitesi yuksekse agresiflik, dusukse temkin vurgulansin.
 - Stock Market Fear & Greed ve Crypto Fear & Greed verilerini sentiment konfirmasyonu olarak kullan; iki endeks arasindan ayrisma varsa bunu belirt.
 - Karar Motoru'ndaki (EVET/DIKKAT/HAYIR) sonucu "Long/Short/Bekle" bolumune dogal dille entegre et; skoru aynen kopyalama.
+- "Makro Ortam ve Risk İştahı" bolumundeki HER metrik (VIX, DXY, US10Y, SP500, NASDAQ, DAX, NIKKEI, GOLD, SILVER, OIL) icin hem fiyat/seviye hem de 24s degisim yuzdesini birlikte yaz. Sadece degisim veya sadece fiyat yazmak yasaktir; her metrik "X seviyesinde, 24 saatte %Y degisim" formatinda olmali.
+- "Ekonomik Takvim ve Olası Etkiler" bolumunde veri etiketine dikkat et: [AÇIKLANDI] etiketi tasiyan olaylar icin gerceklesen rakamlar beklentinin uzerinde mi altinda mi kaldi, piyasaya etkisi ne oldu tonunda yaz. [HENÜZ AÇIKLANMADI] etiketi tasiyan olaylar icin olasi senaryolar ve beklentiler uzerinden yaz. Hic bir durumda aciklanmis bir veri icin "aciklanacak" veya "bekleniyor" gibi ifadeler kullanma.
 """
