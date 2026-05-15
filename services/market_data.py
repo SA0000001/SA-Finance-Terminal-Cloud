@@ -1,3 +1,4 @@
+import json
 import math
 import re
 import ssl
@@ -15,7 +16,7 @@ import yfinance as yf
 from domain.parsers import parse_number
 from domain.signals import build_orderbook_signal, clear_wall_levels, extract_wall_levels, save_wall_levels
 from services.health import HealthRecorder
-from services.http_utils import FetchError, safe_fetch_json, safe_fetch_text
+from services.http_utils import LOGGER, FetchError, safe_fetch_json, safe_fetch_text
 
 HEADERS = {"User-Agent": "Mozilla/5.0", "Accept": "application/json"}
 ETF_FLOW_COLUMNS = ("IBIT", "FBTC", "BITB", "ARKB", "BTCO", "EZBC", "BRRR", "HODL", "BTCW", "MSBT", "GBTC", "BTC", "TOTAL")
@@ -121,18 +122,32 @@ def _tv_fetch_daily_bars(tv_symbol: str, n_bars: int = 3) -> list[dict]:
             f'={{"symbol":"{tv_symbol}","adjustment":"splits"}}']))
         ws.send(_tv_msg("create_series",        [cs, "sds_1", "s1", "sds_sym_1", "1D", n_bars]))
 
-    try:
-        _websocket.WebSocketApp(
-            "wss://data.tradingview.com/socket.io/websocket?from=chart%2F&date=&type=chart",
-            header={"Origin": "https://www.tradingview.com", "User-Agent": "Mozilla/5.0"},
-            on_open=on_open,
-            on_message=on_message,
-            on_error=lambda ws, e: None,
-            on_close=lambda ws, *a: None,
-        ).run_forever(sslopt={"cert_reqs": ssl.CERT_NONE})
-    except Exception:
-        pass
+    _WS_TIMEOUT = 20  # WebSocket bağlantısı için toplam zaman aşımı (saniye)
 
+    import threading
+
+    def _run_ws():
+        try:
+            _websocket.WebSocketApp(
+                "wss://data.tradingview.com/socket.io/websocket?from=chart%2F&date=&type=chart",
+                header={"Origin": "https://www.tradingview.com", "User-Agent": "Mozilla/5.0"},
+                on_open=on_open,
+                on_message=on_message,
+                on_error=lambda ws, e: None,
+                on_close=lambda ws, *a: None,
+            ).run_forever(
+                sslopt={"cert_reqs": ssl.CERT_NONE},
+                ping_interval=10,
+                ping_timeout=8,
+            )
+        except Exception:
+            pass
+
+    t = threading.Thread(target=_run_ws, daemon=True)
+    t.start()
+    t.join(timeout=_WS_TIMEOUT)
+
+    # Zaman aşımı veya hata durumunda bars boş döner; caller None'a düşer
     return bars
 
 

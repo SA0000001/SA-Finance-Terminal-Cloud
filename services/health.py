@@ -85,6 +85,7 @@ def merge_source_health(previous: dict[str, dict] | None, latest: dict[str, dict
     merged: dict[str, dict] = {}
     now = datetime.now(timezone.utc)
 
+    # First: process all sources present in latest (same logic as before)
     for source, entry in latest.items():
         merged_entry = dict(previous.get(source, {}))
         merged_entry.update(entry)
@@ -108,6 +109,16 @@ def merge_source_health(previous: dict[str, dict] | None, latest: dict[str, dict
 
         merged_entry["stale"] = is_stale(merged_entry, now)
         merged[source] = merged_entry
+
+    # Second: carry forward previous sources absent from latest, marked as stale
+    for source, entry in previous.items():
+        if source not in merged:
+            carried = dict(entry)
+            carried["source"] = source
+            carried["ok"] = False
+            carried["stale"] = True
+            carried.setdefault("stale_after_seconds", stale_after_for_source(source))
+            merged[source] = carried
 
     return merged
 
