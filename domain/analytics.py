@@ -283,8 +283,9 @@ def _regime_confidence_score(
     if fragility["score"] >= 75 or factors["positioning"]["score"] < 36 or weakest_factor["score"] < 36:
         cap = min(cap, 48)
 
-    # Floor: veri mevcutsa hiçbir zaman 12'nin altına düşmez
-    floor = 12
+    # Floor: kritik veri mevcutsa minimum 12, veri çok zayıfsa floor kaldırılır
+    # data_confidence < 30 → veri kalitesi yetersiz, floor uygulanmaz
+    floor = 12 if data_confidence >= 30 else 0
     return max(floor, clamp_score(min(calibrated, cap)))
 
 
