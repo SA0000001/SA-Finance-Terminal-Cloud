@@ -1,10 +1,10 @@
-from ui.components import build_data_table_card_html, delta_tone_class
+from ui.components import build_data_table_card_html, delta_css
 
 
-def test_delta_tone_class_maps_positive_negative_and_missing_values():
-    assert delta_tone_class("1.25%") == "data-delta-pos"
-    assert delta_tone_class("-0.42%") == "data-delta-neg"
-    assert delta_tone_class("-") == "data-delta-neutral"
+def test_delta_css_maps_positive_negative_and_missing_values():
+    assert delta_css("1.25%") == "dc-pos"
+    assert delta_css("-0.42%") == "dc-neg"
+    assert delta_css("-") == "dc-neu"
 
 
 def test_build_data_table_card_html_renders_delta_column_when_enabled():
@@ -19,9 +19,9 @@ def test_build_data_table_card_html_renders_delta_column_when_enabled():
         show_delta=True,
     )
 
-    assert "Gunluk %" in html
-    assert "data-grid-head-with-delta" in html
-    assert "data-row-with-delta" in html
-    assert "data-delta data-delta-pos" in html
-    assert "data-delta data-delta-neg" in html
-    assert "data-delta data-delta-neutral" in html
+    assert "%" in html
+    assert "dc-grid-head-delta" in html
+    assert "dc-row-delta" in html
+    assert "dc-delta dc-pos" in html
+    assert "dc-delta dc-neg" in html
+    assert "dc-delta dc-neu" in html
