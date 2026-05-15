@@ -138,7 +138,7 @@ def save_report_to_disk(report: dict, context: dict, config: RuntimeConfig, now:
         "date":      now.strftime("%Y-%m-%d"),
         "time_label": "16:30" if config.slot == "1630" else "22:45",
         "regime": {
-            "overlay":         _safe(scores.get("overall")),
+            "overlay":         _safe(scores.get("overlay")),
             "score":           _safe(scores.get("overall")),
             "dominant_driver": _safe(scores.get("dominant_driver")),
             "bias":            _safe(scores.get("bias")),
