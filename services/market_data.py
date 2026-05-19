@@ -970,7 +970,7 @@ def fetch_live_market_cap_segments():
     cap_symbols = {
         "TOTAL": "https://r.jina.ai/http://www.tradingview.com/symbols/TOTAL/",
         "TOTAL2": "https://r.jina.ai/http://www.tradingview.com/symbols/TOTAL2/",
-        "TOTAL3": "https://r.jina.ai/http://www.tradingview.com/symbols/TOTAL3/",
+        "TOTAL3": "https://r.jina.ai/http://www.tradingview.com/symbols/TOTAL3/?exchange=CRYPTOCAP",
         "OTHERS": "https://r.jina.ai/http://www.tradingview.com/symbols/OTHERS/?exchange=CRYPTOCAP",
     }
     # Dominance sembolleri (parse_tradingview_dominance kullanır)
