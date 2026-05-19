@@ -970,7 +970,7 @@ def fetch_live_market_cap_segments():
     cap_symbols = {
         "TOTAL": "https://r.jina.ai/http://www.tradingview.com/symbols/TOTAL/",
         "TOTAL2": "https://r.jina.ai/http://www.tradingview.com/symbols/TOTAL2/",
-        "TOTAL3": "https://r.jina.ai/http://www.tradingview.com/symbols/TOTAL3/?exchange=CRYPTOCAP",
+        "TOTAL3": "https://r.jina.ai/http://www.tradingview.com/symbols/TOTAL3/",
         "OTHERS": "https://r.jina.ai/http://www.tradingview.com/symbols/OTHERS/?exchange=CRYPTOCAP",
     }
     # Dominance sembolleri (parse_tradingview_dominance kullanır)
@@ -1050,17 +1050,28 @@ def fetch_live_market_cap_segments():
 
     if "TOTAL" in tradingview_parsed:
         result["TOTAL_CAP_SOURCE"] = "TradingView"
+
+        # TOTAL3 parse edilemedi ama TOTAL + dominance varsa hesapla
+        if "TOTAL3" not in tradingview_parsed and result["TOTAL_CAP_NUM"] is not None:
+            btc_d = dom_parsed.get("BTC_D")
+            eth_d = dom_parsed.get("ETH_D")
+            if btc_d is not None and eth_d is not None:
+                total3_num = result["TOTAL_CAP_NUM"] * (1 - (btc_d + eth_d) / 100)
+                result["TOTAL3_CAP"] = format_market_cap_short(total3_num)
+                result["TOTAL3_CAP_NUM"] = total3_num
+                LOGGER.warning("TOTAL3 TradingView'dan gelmedi; TOTAL + BTC.D + ETH.D ile hesaplandi.")
+
         if len(tradingview_parsed) == len(cap_symbols):
             health.success("TradingView Market Cap", latency, stale_after_seconds=300)
         else:
-            # Kısmi: TOTAL geldi ama bazı semboller eksik
+            # Kismi: TOTAL geldi ama bazi semboller eksik
             missing = [s for s in cap_symbols if s not in tradingview_parsed]
             health.success(
                 "TradingView Market Cap",
                 latency,
                 stale_after_seconds=300,
             )
-            LOGGER.warning("TradingView partial fetch — missing: %s", missing)
+            LOGGER.warning("TradingView partial fetch - missing: %s", missing)
         result["_health"] = health.export()
         return result
 
