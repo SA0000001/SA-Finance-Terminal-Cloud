@@ -1541,6 +1541,174 @@ def render_report_tab(client, data, brief, analytics, alerts, health_summary, re
 
 # ─── TAB: ATLAS ──────────────────────────────────────────────────────────────
 
+
+# ─── ATLAS: On-Chain Reference Section ─────────────────────────────────────────────
+
+def _render_atlas_onchain_section() -> None:
+    """
+    Atlas sekmesindeki On-Chain Reference bölümü.
+    Onchain tab'dan veri tekrar çekmez;
+    ui.onchain_tab'daki cache'li yükleme fonksiyonunu kullanır.
+    """
+    from ui.onchain_tab import _load_and_compute
+
+    try:
+        oc, btc_r, usdt_r, usdc_r, df_computed = _load_and_compute(force_refresh=False)
+    except Exception as exc:  # noqa: BLE001
+        st.warning(f"On-chain veri yüklenemedi: {exc}")
+        return
+
+    if oc.regime == "UNAVAILABLE":
+        st.info(
+            "On-chain veri şu an mevcut değil. "
+            "'On-Chain' sekmesinden 'Veriyi Yenile' butonuna basmış olman gerekiyor."
+        )
+        return
+
+    latest = oc.latest
+
+    def _v(key, fmt_fn=None, fallback="N/A"):
+        val = latest.get(key)
+        if val is None:
+            return fallback
+        import math
+        if isinstance(val, float) and (math.isnan(val) or math.isinf(val)):
+            return fallback
+        if fmt_fn:
+            try:
+                return fmt_fn(val)
+            except Exception:
+                return fallback
+        return str(round(val, 4))
+
+    def _usd(v):
+        import math
+        if abs(v) >= 1e12: return f"${v/1e12:.2f}T"
+        if abs(v) >= 1e9:  return f"${v/1e9:.2f}B"
+        if abs(v) >= 1e6:  return f"${v/1e6:.2f}M"
+        return f"${v:,.2f}"
+
+    def _btc(v):
+        return f"{v:,.0f} BTC"
+
+    def _r(v):
+        return f"{v:.4f}x"
+
+    # Status header
+    from ui.components import esc
+    status = btc_r.source_status
+    score_str = f"{oc.score}/100" if oc.score is not None else "N/A"
+    st.markdown(
+        f"<div style='display:flex;gap:10px;align-items:center;flex-wrap:wrap;"
+        f"font-family:var(--font-mono);font-size:0.7rem;color:var(--text-muted);"
+        f"margin-bottom:10px'>"
+        f"<span>SOURCE <strong style='color:var(--accent)'>{esc(status.upper())}</strong></span>"
+        f"<span>·</span>"
+        f"<span>SON VERI {esc(btc_r.latest_date or 'N/A')}</span>"
+        f"<span>·</span>"
+        f"<span>ON-CHAIN SCORE <strong style='color:var(--accent)'>{esc(score_str)}</strong></span>"
+        f"<span>·</span>"
+        f"<span>REJİM <strong style='color:var(--warning)'>{esc(oc.regime)}</strong></span>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+    # Three-column metric table
+    onchain_sections = [
+        {
+            "title": "Valuation",
+            "kicker": "On-Chain · Valuation",
+            "caption": "Estimated seriler Coin Metrics MVRV ve Market Cap'ten türetilmiştir.",
+            "rows": [
+                ("MVRV",                   _v("CapMVRVCur", lambda v: f"{v:.4f}")),
+                ("Est. NUPL",              _v("NUPL_Est",   lambda v: f"{v:.4f}")),
+                ("Est. Realized Cap",      _v("CapRealized_Est", _usd)),
+                ("Est. Realized Price",    _v("RealizedPrice_Est", lambda v: f"${v:,.0f}")),
+                ("Est. MVRV Z-Score",      _v("MVRV_Z_Est", lambda v: f"{v:.4f}")),
+                ("Mayer Multiple",         _v("MayerMultiple", _r)),
+                ("Market Cap",             _v("CapMrktCurUSD", _usd)),
+                ("BTC Price",              _v("PriceUSD", lambda v: f"${v:,.0f}")),
+            ],
+        },
+        {
+            "title": "Exchange Flow",
+            "kicker": "On-Chain · Exchange",
+            "caption": "",
+            "rows": [
+                ("Net Flow",               _v("ExchangeNetFlow", _btc)),
+                ("Reserve Ratio",          _v("ExchangeReserveRatio", lambda v: f"{v:.4f}")),
+                ("Inflow Stress",          _v("ExchangeInflowStress", lambda v: f"{v:.4f}x")),
+                ("Outflow Stress",         _v("ExchangeOutflowStress", lambda v: f"{v:.4f}x")),
+                ("Exchange Supply",        _v("SplyExNtv", _btc)),
+                ("FlowInExNtv",            _v("FlowInExNtv", _btc)),
+                ("FlowOutExNtv",           _v("FlowOutExNtv", _btc)),
+                ("Puell Multiple",         _v("PuellMultiple", _r)),
+            ],
+        },
+        {
+            "title": "Miner / Network / Stable",
+            "kicker": "On-Chain · Network",
+            "caption": "",
+            "rows": [
+                ("Miner Revenue Est.",     _v("MinerRevenue_Est", _usd)),
+                ("Hashrate Trend Proxy",   _v("HashrateTrendProxy", lambda v: f"{v:.4f}x")),
+                ("Hash Rate",              _v("HashRate", lambda v: f"{v/1e18:.2f} EH/s")),
+                ("Network Activity",       _v("NetworkActivityComposite", lambda v: f"{v:.4f}")),
+                ("Active Addresses",       _v("AdrActCnt", lambda v: f"{v/1e6:.2f}M")),
+                ("TxCnt",                  _v("TxCnt", lambda v: f"{v/1e3:.1f}K")),
+                ("SSR",                    _v("StablecoinSupplyRatio", lambda v: f"{v:.4f}")),
+                ("Fee Pressure Ratio",     _v("FeePressureRatio", lambda v: f"{v:.6f}")),
+            ],
+        },
+    ]
+
+    cols = st.columns(3)
+    for col, section in zip(cols, onchain_sections):
+        with col:
+            render_data_table_card(
+                section["title"],
+                [(row[0], row[1]) for row in section["rows"]],
+                kicker=section["kicker"],
+                caption=section["caption"],
+                show_delta=False,
+            )
+
+    # Drivers inline
+    if oc.positive_drivers or oc.negative_drivers:
+        st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+        d_left, d_right = st.columns(2)
+        with d_left:
+            if oc.positive_drivers:
+                st.markdown(
+                    "<div style='font-family:var(--font-mono);font-size:0.6rem;"
+                    "letter-spacing:0.12em;text-transform:uppercase;"
+                    "color:var(--positive);margin-bottom:4px'>Pozitif Driver</div>",
+                    unsafe_allow_html=True,
+                )
+                for d in oc.positive_drivers[:4]:
+                    st.markdown(
+                        f"<div style='font-size:0.76rem;color:var(--text-secondary);"
+                        f"padding:3px 0;border-bottom:1px solid rgba(100,140,185,0.06)'>"
+                        f"▲ {esc(d)}</div>",
+                        unsafe_allow_html=True,
+                    )
+        with d_right:
+            if oc.negative_drivers:
+                st.markdown(
+                    "<div style='font-family:var(--font-mono);font-size:0.6rem;"
+                    "letter-spacing:0.12em;text-transform:uppercase;"
+                    "color:var(--negative);margin-bottom:4px'>Negatif Driver</div>",
+                    unsafe_allow_html=True,
+                )
+                for d in oc.negative_drivers[:4]:
+                    st.markdown(
+                        f"<div style='font-size:0.76rem;color:var(--text-secondary);"
+                        f"padding:3px 0;border-bottom:1px solid rgba(100,140,185,0.06)'>"
+                        f"▼ {esc(d)}</div>",
+                        unsafe_allow_html=True,
+                    )
+
+
 def render_all_metrics_tab(data: dict):
     st.markdown(
         '<div class="s-kicker">Deep Reference Layer</div>'
@@ -1556,6 +1724,11 @@ def render_all_metrics_tab(data: dict):
         render_table_row(data, [DATA_ATLAS_SECTIONS[3], DATA_ATLAS_SECTIONS[4], DATA_ATLAS_SECTIONS[7]], 3)
     with st.expander("Macro, Commodities & FX", expanded=False):
         render_table_row(data, [DATA_ATLAS_SECTIONS[5], DATA_ATLAS_SECTIONS[6], DATA_ATLAS_SECTIONS[8]], 3)
+
+    # ── On-Chain Reference (Coin Metrics) ────────────────────────────────
+    st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
+    with st.expander("On-Chain Reference (Coin Metrics)", expanded=False):
+        _render_atlas_onchain_section()
 
 
 # ─── MAIN ─────────────────────────────────────────────────────────────────────
