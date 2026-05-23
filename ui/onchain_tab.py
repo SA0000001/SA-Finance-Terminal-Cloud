@@ -9,6 +9,7 @@ import math
 from typing import Optional
 
 import pandas as pd
+import plotly.graph_objects as go
 import streamlit as st
 
 from domain.onchain_analytics import OnchainAnalytics, build_onchain_analytics
@@ -195,40 +196,248 @@ def _driver_list(items: list[str], kind: str) -> str:
 
 # ─── Chart helpers ────────────────────────────────────────────────────────────
 
-_CHART_START = pd.Timestamp("2020-01-01")
+_CHART_START = pd.Timestamp("2025-01-01")
+
+# Terminal palette (mirrors theme.py CSS vars)
+_C_ACCENT   = "#52c8ff"
+_C_POSITIVE = "#32d98c"
+_C_NEGATIVE = "#ff5f72"
+_C_WARNING  = "#f0c050"
+_C_MUTED    = "#8aa0b8"
+_C_BG       = "#081422"
+_C_SURFACE  = "#0c1b2e"
+_C_BORDER   = "rgba(100,140,185,0.18)"
+_C_TEXT_PRI = "#eef3fa"
+_C_TEXT_SEC = "#bfcedd"
+_FONT_MONO  = "IBM Plex Mono, Courier New, monospace"
+
+# Default line colour palette (cycles for multi-series charts)
+_LINE_COLORS = [_C_ACCENT, _C_POSITIVE, _C_NEGATIVE, _C_WARNING, _C_MUTED]
+
+# Pretty display name map (internal col → legend label)
+_COL_LABELS: dict[str, str] = {
+    "PriceUSD":                 "BTC Price",
+    "RealizedPrice_Est":        "Est. Realized Price",
+    "CapMVRVCur":               "MVRV",
+    "NUPL_Est":                 "Est. NUPL",
+    "MVRV_Z_Est":               "Est. MVRV Z-Score",
+    "MayerMultiple":            "Mayer Multiple",
+    "PuellMultiple":            "Puell Multiple",
+    "FlowInExNtv":              "Inflow",
+    "FlowOutExNtv":             "Outflow",
+    "ExchangeNetFlow":          "Net Flow",
+    "SplyExNtv":                "Exchange Supply",
+    "ExchangeReserveRatio":     "Reserve Ratio",
+    "ExchangeInflowStress":     "Inflow Stress",
+    "ExchangeOutflowStress":    "Outflow Stress",
+    "AdrActCnt":                "Active Addresses",
+    "TxCnt":                    "Tx Count",
+    "TxTfrCnt":                 "Tx Transfer Count",
+    "NetworkActivityComposite": "Network Activity",
+    "FeePressureRatio":         "Fee Pressure",
+    "MinerRevenue_Est":         "Miner Revenue Est.",
+    "HashRate":                 "Hash Rate",
+    "HashrateTrendProxy":       "Hashrate Trend Proxy",
+    "StablecoinSupplyRatio":    "SSR",
+}
+
+# Columns that benefit from a secondary y-axis (second colour group)
+_SECONDARY_COLS: set[str] = {"NUPL_Est", "ExchangeOutflowStress", "TxTfrCnt"}
 
 
-def _try_line_chart(df: pd.DataFrame, cols: list[str], title: str, height: int = 200) -> None:
-    """Render line chart only if df has valid data for at least one col.
-    Data is filtered to start from 2020-01-01.
-    """
+def _plotly_layout(title: str, height: int) -> dict:
+    """Base Plotly layout dict matching terminal dark theme."""
+    return dict(
+        height=height,
+        margin=dict(l=10, r=10, t=36, b=28),
+        paper_bgcolor=_C_BG,
+        plot_bgcolor=_C_SURFACE,
+        font=dict(family=_FONT_MONO, size=10, color=_C_TEXT_SEC),
+        title=dict(
+            text=title.upper(),
+            font=dict(family=_FONT_MONO, size=10, color=_C_MUTED),
+            x=0.01, y=0.98, xanchor="left", yanchor="top",
+        ),
+        legend=dict(
+            orientation="h",
+            x=0, y=-0.12,
+            font=dict(family=_FONT_MONO, size=9, color=_C_TEXT_SEC),
+            bgcolor="rgba(0,0,0,0)",
+            bordercolor="rgba(0,0,0,0)",
+        ),
+        xaxis=dict(
+            showgrid=True,
+            gridcolor="rgba(100,140,185,0.08)",
+            gridwidth=1,
+            zeroline=False,
+            tickfont=dict(family=_FONT_MONO, size=9, color=_C_MUTED),
+            tickformat="%b %Y",
+            linecolor="rgba(100,140,185,0.18)",
+            showline=True,
+        ),
+        yaxis=dict(
+            showgrid=True,
+            gridcolor="rgba(100,140,185,0.08)",
+            gridwidth=1,
+            zeroline=False,
+            tickfont=dict(family=_FONT_MONO, size=9, color=_C_MUTED),
+            linecolor="rgba(100,140,185,0.18)",
+            showline=False,
+            side="left",
+        ),
+        yaxis2=dict(
+            overlaying="y",
+            side="right",
+            showgrid=False,
+            zeroline=False,
+            tickfont=dict(family=_FONT_MONO, size=9, color=_C_MUTED),
+            showline=False,
+        ),
+        hovermode="x unified",
+        hoverlabel=dict(
+            bgcolor=_C_SURFACE,
+            bordercolor=_C_ACCENT,
+            font=dict(family=_FONT_MONO, size=10, color=_C_TEXT_PRI),
+        ),
+    )
+
+
+def _prep_chart_df(
+    df: pd.DataFrame,
+    cols: list[str],
+) -> tuple[pd.DataFrame, list[str]]:
+    """Filter to 2025+, drop all-NaN cols, sort. Returns (df, available_cols)."""
     available = [c for c in cols if c in df.columns]
     if not available:
-        st.caption(f"ℹ {title}: insufficient data")
-        return
-    chart_df = df[["time"] + available].copy() if "time" in df.columns else df[available].copy()
-    if "time" in chart_df.columns:
-        chart_df["time"] = pd.to_datetime(chart_df["time"], errors="coerce")
-        chart_df = chart_df[chart_df["time"] >= _CHART_START]
-        chart_df = chart_df.dropna(subset=["time"])
-        chart_df = chart_df.sort_values("time")
-        chart_df = chart_df.set_index("time")
+        return pd.DataFrame(), []
+    chart_df = df[["time"] + available].copy()
+    chart_df["time"] = pd.to_datetime(chart_df["time"], errors="coerce")
+    chart_df = chart_df[chart_df["time"] >= _CHART_START]
+    chart_df = chart_df.dropna(subset=["time"]).sort_values("time")
     chart_df = chart_df.replace([float("inf"), float("-inf")], None)
-    # Drop columns that are entirely NaN (would show as "insufficient data")
     chart_df = chart_df.dropna(axis=1, how="all")
-    chart_df = chart_df.dropna(how="all")
-    if chart_df.empty or len(chart_df.columns) == 0:
-        st.caption(f"ℹ {title}: no data to display")
+    available = [c for c in available if c in chart_df.columns]
+    return chart_df, available
+
+
+def _oc_chart(
+    df: pd.DataFrame,
+    cols: list[str],
+    title: str,
+    height: int = 280,
+    use_secondary: bool = False,
+    fill_first: bool = False,
+    zero_line: bool = False,
+) -> None:
+    """
+    Render a styled Plotly line chart in the terminal dark theme.
+
+    Args:
+        df:           Computed DataFrame with time column.
+        cols:         Column names to plot.
+        title:        Chart title (uppercased automatically).
+        height:       Pixel height.
+        use_secondary: If True, second series uses right y-axis.
+        fill_first:   Fill area under the first series.
+        zero_line:    Draw a y=0 reference line.
+    """
+    chart_df, available = _prep_chart_df(df, cols)
+    if chart_df.empty or not available:
+        st.markdown(
+            f"<div style='font-family:{_FONT_MONO};font-size:0.6rem;"
+            f"color:{_C_MUTED};padding:6px 0;text-transform:uppercase'>"
+            f"{esc(title)} — veri yetersiz</div>",
+            unsafe_allow_html=True,
+        )
         return
-    # Show title with remaining column count
-    col_label = ", ".join(str(c) for c in chart_df.columns[:3])
-    st.markdown(
-        f"<div style='font-family:var(--font-mono);font-size:0.62rem;"
-        f"letter-spacing:0.12em;text-transform:uppercase;"
-        f"color:var(--text-muted);margin-bottom:4px'>{esc(title)}</div>",
-        unsafe_allow_html=True,
-    )
-    st.line_chart(chart_df, height=height, use_container_width=True)
+
+    fig = go.Figure()
+    layout = _plotly_layout(title, height)
+
+    for i, col in enumerate(available):
+        color = _LINE_COLORS[i % len(_LINE_COLORS)]
+        label = _COL_LABELS.get(col, col)
+        is_secondary = use_secondary and i > 0
+        yaxis = "y2" if is_secondary else "y1"
+
+        trace_kwargs: dict = dict(
+            x=chart_df["time"],
+            y=chart_df[col],
+            name=label,
+            mode="lines",
+            line=dict(color=color, width=1.5),
+            yaxis=yaxis,
+            hovertemplate=f"<b>{label}</b>: %{{y:.4f}}<extra></extra>",
+        )
+        if fill_first and i == 0:
+            trace_kwargs["fill"] = "tozeroy"
+            trace_kwargs["fillcolor"] = color.replace("#", "rgba(").rstrip(")")                 if color.startswith("rgba") else f"rgba({int(color[1:3],16)},{int(color[3:5],16)},{int(color[5:7],16)},0.06)"
+
+        fig.add_trace(go.Scatter(**trace_kwargs))
+
+    if zero_line:
+        fig.add_hline(
+            y=0,
+            line=dict(color=_C_MUTED, width=1, dash="dot"),
+            opacity=0.4,
+        )
+
+    # Remove secondary y-axis from layout if unused
+    if not use_secondary or len(available) < 2:
+        layout.pop("yaxis2", None)
+
+    fig.update_layout(**layout)
+    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+
+
+def _oc_dual_axis_chart(
+    df: pd.DataFrame,
+    col_primary: str,
+    col_secondary: str,
+    title: str,
+    height: int = 280,
+) -> None:
+    """Two-series chart with independent y-axes (e.g. Price + Realized Price)."""
+    chart_df, available = _prep_chart_df(df, [col_primary, col_secondary])
+    if chart_df.empty or col_primary not in available:
+        st.markdown(
+            f"<div style='font-family:{_FONT_MONO};font-size:0.6rem;"
+            f"color:{_C_MUTED};padding:6px 0;text-transform:uppercase'>"
+            f"{esc(title)} — veri yetersiz</div>",
+            unsafe_allow_html=True,
+        )
+        return
+
+    fig = go.Figure()
+    layout = _plotly_layout(title, height)
+
+    # Primary
+    fig.add_trace(go.Scatter(
+        x=chart_df["time"], y=chart_df[col_primary],
+        name=_COL_LABELS.get(col_primary, col_primary),
+        mode="lines",
+        line=dict(color=_C_ACCENT, width=1.8),
+        yaxis="y1",
+        hovertemplate=f"<b>{_COL_LABELS.get(col_primary, col_primary)}</b>: $%{{y:,.0f}}<extra></extra>",
+    ))
+
+    # Secondary (right axis)
+    if col_secondary in available:
+        fig.add_trace(go.Scatter(
+            x=chart_df["time"], y=chart_df[col_secondary],
+            name=_COL_LABELS.get(col_secondary, col_secondary),
+            mode="lines",
+            line=dict(color=_C_POSITIVE, width=1.4, dash="dot"),
+            yaxis="y2",
+            hovertemplate=f"<b>{_COL_LABELS.get(col_secondary, col_secondary)}</b>: $%{{y:,.0f}}<extra></extra>",
+        ))
+        layout["yaxis2"] = dict(
+            overlaying="y", side="right", showgrid=False,
+            zeroline=False, tickfont=dict(family=_FONT_MONO, size=9, color=_C_POSITIVE),
+        )
+
+    fig.update_layout(**layout)
+    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
 
 # ─── Panels ───────────────────────────────────────────────────────────────────
@@ -291,16 +500,7 @@ def _render_valuation_panel(oc: OnchainAnalytics, df_computed: Optional[pd.DataF
         unsafe_allow_html=True,
     )
 
-    if df_computed is not None and not df_computed.empty:
-        with st.expander("Valuation Charts", expanded=False):
-            c1, c2 = st.columns(2)
-            with c1:
-                _try_line_chart(df_computed, ["PriceUSD", "RealizedPrice_Est"], "Price vs Estimated Realized Price")
-                _try_line_chart(df_computed, ["NUPL_Est"], "Estimated NUPL")
-                _try_line_chart(df_computed, ["MayerMultiple"], "Mayer Multiple")
-            with c2:
-                _try_line_chart(df_computed, ["CapMVRVCur", "NUPL_Est"], "MVRV & Estimated NUPL")
-                _try_line_chart(df_computed, ["MVRV_Z_Est"], "Estimated MVRV Z-Score")
+    # charts rendered in the unified section below
 
 
 def _render_exchange_panel(oc: OnchainAnalytics, df_computed: Optional[pd.DataFrame]) -> None:
@@ -333,16 +533,7 @@ def _render_exchange_panel(oc: OnchainAnalytics, df_computed: Optional[pd.DataFr
     ]
     _render_metric_row(items, cols=4)
 
-    if df_computed is not None and not df_computed.empty:
-        with st.expander("Exchange Flow Charts", expanded=False):
-            c1, c2 = st.columns(2)
-            with c1:
-                _try_line_chart(df_computed, ["FlowInExNtv", "FlowOutExNtv"], "Inflow / Outflow")
-                _try_line_chart(df_computed, ["SplyExNtv"], "Exchange Supply (SplyExNtv)")
-            with c2:
-                _try_line_chart(df_computed, ["ExchangeNetFlow"], "Exchange Net Flow")
-                _try_line_chart(df_computed, ["ExchangeReserveRatio"], "Exchange Reserve Ratio")
-                _try_line_chart(df_computed, ["ExchangeInflowStress", "ExchangeOutflowStress"], "Inflow & Outflow Stress")
+    # charts rendered in the unified section below
 
 
 def _render_miner_network_panel(oc: OnchainAnalytics, df_computed: Optional[pd.DataFrame]) -> None:
@@ -382,18 +573,7 @@ def _render_miner_network_panel(oc: OnchainAnalytics, df_computed: Optional[pd.D
         unsafe_allow_html=True,
     )
 
-    if df_computed is not None and not df_computed.empty:
-        with st.expander("Miner & Network Charts", expanded=False):
-            c1, c2 = st.columns(2)
-            with c1:
-                _try_line_chart(df_computed, ["PuellMultiple"], "Puell Multiple")
-                _try_line_chart(df_computed, ["MinerRevenue_Est"], "Miner Revenue Estimate")
-                _try_line_chart(df_computed, ["HashRate"], "Hash Rate")
-            with c2:
-                _try_line_chart(df_computed, ["HashrateTrendProxy"], "Hashrate Trend Proxy")
-                _try_line_chart(df_computed, ["NetworkActivityComposite"], "Network Activity Composite")
-                _try_line_chart(df_computed, ["AdrActCnt"], "Active Addresses")
-                _try_line_chart(df_computed, ["TxCnt", "TxTfrCnt"], "TxCnt / TxTfrCnt")
+    # charts rendered in the unified section below
 
 
 def _render_stablecoin_panel(
@@ -435,10 +615,167 @@ def _render_stablecoin_panel(
     ]
     _render_metric_row(items, cols=4)
 
-    if df_computed is not None and not df_computed.empty:
-        with st.expander("Stablecoin Charts", expanded=False):
-            _try_line_chart(df_computed, ["StablecoinSupplyRatio"], "Stablecoin Supply Ratio")
+    # charts rendered in the unified section below
 
+
+
+
+def _render_charts_section(df_computed: Optional[pd.DataFrame]) -> None:
+    """
+    Unified CHARTS section — all on-chain charts in one expander,
+    organised in 2-column grid rows, styled with Plotly terminal theme.
+    Data range: 2025-01-01 → latest.
+    """
+    if df_computed is None or df_computed.empty:
+        return
+
+    st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
+    _section_header("Historical Charts", "CHARTS · 2025-01-01 → Güncel")
+
+    with st.expander("Chartları Göster / Gizle", expanded=True):
+
+        # ── Row 1: Valuation ──────────────────────────────────────────────
+        st.markdown(
+            "<div style='font-family:var(--font-mono);font-size:0.62rem;"
+            "letter-spacing:0.16em;text-transform:uppercase;"
+            "color:var(--accent);padding:10px 0 4px'>Valuation</div>",
+            unsafe_allow_html=True,
+        )
+        r1c1, r1c2 = st.columns(2)
+        with r1c1:
+            _oc_dual_axis_chart(
+                df_computed, "PriceUSD", "RealizedPrice_Est",
+                "PriceUSD + Estimated Realized Price", height=260,
+            )
+        with r1c2:
+            _oc_chart(
+                df_computed, ["MVRV_Z_Est"],
+                "Estimated MVRV Z-Score", height=260,
+            )
+
+        r2c1, r2c2 = st.columns(2)
+        with r2c1:
+            _oc_chart(
+                df_computed, ["CapMVRVCur", "NUPL_Est"],
+                "MVRV + Estimated NUPL", height=260,
+                use_secondary=True,
+            )
+        with r2c2:
+            _oc_chart(
+                df_computed, ["PuellMultiple"],
+                "Puell Multiple", height=260,
+            )
+
+        r3c1, r3c2 = st.columns(2)
+        with r3c1:
+            _oc_chart(
+                df_computed, ["MayerMultiple"],
+                "Mayer Multiple", height=260,
+            )
+        with r3c2:
+            _oc_chart(
+                df_computed, ["NUPL_Est"],
+                "Estimated NUPL", height=260,
+            )
+
+        # ── Row 4: Exchange Flow ──────────────────────────────────────────
+        st.markdown(
+            "<div style='font-family:var(--font-mono);font-size:0.62rem;"
+            "letter-spacing:0.16em;text-transform:uppercase;"
+            "color:var(--accent);padding:14px 0 4px'>Exchange Flow</div>",
+            unsafe_allow_html=True,
+        )
+        r4c1, r4c2 = st.columns(2)
+        with r4c1:
+            _oc_chart(
+                df_computed, ["FlowInExNtv", "FlowOutExNtv"],
+                "Inflow / Outflow", height=260,
+            )
+        with r4c2:
+            _oc_chart(
+                df_computed, ["ExchangeNetFlow"],
+                "Exchange Net Flow", height=260,
+                zero_line=True,
+            )
+
+        r5c1, r5c2 = st.columns(2)
+        with r5c1:
+            _oc_chart(
+                df_computed, ["SplyExNtv"],
+                "Exchange Supply (SplyExNtv)", height=260,
+            )
+        with r5c2:
+            _oc_chart(
+                df_computed, ["ExchangeReserveRatio"],
+                "Exchange Reserve Ratio", height=260,
+            )
+
+        r6c1, r6c2 = st.columns(2)
+        with r6c1:
+            _oc_chart(
+                df_computed, ["ExchangeInflowStress", "ExchangeOutflowStress"],
+                "Exchange Stress", height=260,
+                use_secondary=False,
+            )
+
+        # ── Row 7: Miner & Network ────────────────────────────────────────
+        st.markdown(
+            "<div style='font-family:var(--font-mono);font-size:0.62rem;"
+            "letter-spacing:0.16em;text-transform:uppercase;"
+            "color:var(--accent);padding:14px 0 4px'>Miner & Network</div>",
+            unsafe_allow_html=True,
+        )
+        r7c1, r7c2 = st.columns(2)
+        with r7c1:
+            _oc_chart(
+                df_computed, ["MinerRevenue_Est"],
+                "Miner Revenue Estimate", height=260,
+            )
+        with r7c2:
+            _oc_chart(
+                df_computed, ["HashrateTrendProxy"],
+                "Hashrate Trend Proxy", height=260,
+            )
+
+        r8c1, r8c2 = st.columns(2)
+        with r8c1:
+            _oc_chart(
+                df_computed, ["NetworkActivityComposite"],
+                "Network Activity Composite", height=260,
+                zero_line=True,
+            )
+        with r8c2:
+            _oc_chart(
+                df_computed, ["AdrActCnt"],
+                "Active Addresses", height=260,
+            )
+
+        r9c1, r9c2 = st.columns(2)
+        with r9c1:
+            _oc_chart(
+                df_computed, ["TxCnt", "TxTfrCnt"],
+                "TxCnt / TxTfrCnt", height=260,
+                use_secondary=True,
+            )
+        with r9c2:
+            _oc_chart(
+                df_computed, ["HashRate"],
+                "Hash Rate", height=260,
+            )
+
+        # ── Row 10: Stablecoin ────────────────────────────────────────────
+        st.markdown(
+            "<div style='font-family:var(--font-mono);font-size:0.62rem;"
+            "letter-spacing:0.16em;text-transform:uppercase;"
+            "color:var(--accent);padding:14px 0 4px'>Stablecoin Liquidity</div>",
+            unsafe_allow_html=True,
+        )
+        r10c1, _ = st.columns(2)
+        with r10c1:
+            _oc_chart(
+                df_computed, ["StablecoinSupplyRatio"],
+                "Stablecoin Supply Ratio", height=260,
+            )
 
 def _render_driver_summary(oc: OnchainAnalytics) -> None:
     _section_header("Driver Summary", "On-Chain Signal Breakdown")
@@ -662,6 +999,9 @@ def render_onchain_tab() -> None:
 
     st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
     _render_stablecoin_panel(oc, usdt_r, usdc_r, df_computed)
+
+    st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
+    _render_charts_section(df_computed)
 
     st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
     _render_driver_summary(oc)
