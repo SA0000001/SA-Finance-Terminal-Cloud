@@ -195,14 +195,21 @@ def _driver_list(items: list[str], kind: str) -> str:
 
 # ─── Chart helpers ────────────────────────────────────────────────────────────
 
+_CHART_START = pd.Timestamp("2020-01-01")
+
+
 def _try_line_chart(df: pd.DataFrame, cols: list[str], title: str, height: int = 200) -> None:
-    """Render line chart only if df has valid data for at least one col."""
+    """Render line chart only if df has valid data for at least one col.
+    Data is filtered to start from 2020-01-01.
+    """
     available = [c for c in cols if c in df.columns]
     if not available:
         st.caption(f"ℹ {title}: insufficient data")
         return
     chart_df = df[["time"] + available].copy() if "time" in df.columns else df[available].copy()
     if "time" in chart_df.columns:
+        chart_df["time"] = pd.to_datetime(chart_df["time"], errors="coerce")
+        chart_df = chart_df[chart_df["time"] >= _CHART_START]
         chart_df = chart_df.set_index("time")
     chart_df = chart_df.replace([float("inf"), float("-inf")], None).dropna(how="all")
     if chart_df.empty:
