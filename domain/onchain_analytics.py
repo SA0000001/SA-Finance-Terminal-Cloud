@@ -160,12 +160,22 @@ def _compute_metrics(
         derived.append("PuellMultiple")
 
     # ── 7. Stablecoin Supply Ratio ────────────────────────────────────────
+    # time kolonlari farkli dtype olabilir (str vs datetime64).
+    # Guvli merge icin tum time kolonlarini normalize et (date-only datetime64).
+    def _norm_time(df: pd.DataFrame) -> pd.DataFrame:
+        d = df.copy()
+        if "time" in d.columns:
+            d["time"] = pd.to_datetime(d["time"], errors="coerce").dt.normalize()
+        return d
+
+    if "time" in out.columns:
+        out["time"] = pd.to_datetime(out["time"], errors="coerce").dt.normalize()
+
     stable_cap: Optional[pd.Series] = None
     if usdt_df is not None and not usdt_df.empty and "CapMrktCurUSD" in usdt_df.columns:
         if usdc_df is not None and not usdc_df.empty and "CapMrktCurUSD" in usdc_df.columns:
-            # Merge both on time
-            usdt_m = usdt_df[["time", "CapMrktCurUSD"]].rename(columns={"CapMrktCurUSD": "_usdt"})
-            usdc_m = usdc_df[["time", "CapMrktCurUSD"]].rename(columns={"CapMrktCurUSD": "_usdc"})
+            usdt_m = _norm_time(usdt_df[["time", "CapMrktCurUSD"]]).rename(columns={"CapMrktCurUSD": "_usdt"})
+            usdc_m = _norm_time(usdc_df[["time", "CapMrktCurUSD"]]).rename(columns={"CapMrktCurUSD": "_usdc"})
             merged = usdt_m.merge(usdc_m, on="time", how="outer")
             merged["_usdt"] = safe_numeric(merged.get("_usdt", pd.Series(dtype=float)))
             merged["_usdc"] = safe_numeric(merged.get("_usdc", pd.Series(dtype=float)))
@@ -177,7 +187,7 @@ def _compute_metrics(
                 )
         else:
             warnings.append("USDC data unavailable; Stablecoin Supply Ratio uses USDT only.")
-            usdt_m = usdt_df[["time", "CapMrktCurUSD"]].rename(columns={"CapMrktCurUSD": "_stable_total"})
+            usdt_m = _norm_time(usdt_df[["time", "CapMrktCurUSD"]]).rename(columns={"CapMrktCurUSD": "_stable_total"})
             if "time" in out.columns:
                 out = out.merge(usdt_m, on="time", how="left")
                 stable_cap = safe_numeric(out["_stable_total"]).where(
@@ -185,7 +195,7 @@ def _compute_metrics(
                 )
     elif usdc_df is not None and not usdc_df.empty and "CapMrktCurUSD" in usdc_df.columns:
         warnings.append("USDT data unavailable; Stablecoin Supply Ratio uses USDC only.")
-        usdc_m = usdc_df[["time", "CapMrktCurUSD"]].rename(columns={"CapMrktCurUSD": "_stable_total"})
+        usdc_m = _norm_time(usdc_df[["time", "CapMrktCurUSD"]]).rename(columns={"CapMrktCurUSD": "_stable_total"})
         if "time" in out.columns:
             out = out.merge(usdc_m, on="time", how="left")
             stable_cap = safe_numeric(out["_stable_total"]).where(
@@ -668,12 +678,13 @@ def build_onchain_analytics(
     def _norm_stable(sdf: Optional[pd.DataFrame]) -> Optional[pd.DataFrame]:
         if sdf is None or sdf.empty:
             return None
-        out = sdf.copy()
-        if "time" in out.columns:
-            out["time"] = pd.to_datetime(out["time"], errors="coerce")
-        if "CapMrktCurUSD" in out.columns:
-            out["CapMrktCurUSD"] = safe_numeric(out["CapMrktCurUSD"])
-        return out
+        s = sdf.copy()
+        if "time" in s.columns:
+            # Always parse to datetime64 so merge keys match BTC df
+            s["time"] = pd.to_datetime(s["time"], errors="coerce")
+        if "CapMrktCurUSD" in s.columns:
+            s["CapMrktCurUSD"] = safe_numeric(s["CapMrktCurUSD"])
+        return s
 
     usdt_norm = _norm_stable(usdt_df)
     usdc_norm = _norm_stable(usdc_df)
