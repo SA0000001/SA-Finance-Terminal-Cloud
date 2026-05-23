@@ -295,9 +295,9 @@ def _plotly_layout(title: str, height: int) -> dict:
         ),
         hovermode="x unified",
         hoverlabel=dict(
-            bgcolor=_C_SURFACE,
+            bgcolor="#eef3fa",
             bordercolor=_C_ACCENT,
-            font=dict(family=_FONT_MONO, size=10, color=_C_TEXT_PRI),
+            font=dict(family=_FONT_MONO, size=10, color="#050d18"),
         ),
     )
 
