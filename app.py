@@ -45,6 +45,7 @@ from ui.components import (
     render_market_brief,
 )
 from ui.layout import normalize_health_cell, render_page_header, render_sidebar
+from ui.onchain_tab import render_onchain_tab
 from ui.theme import TERMINAL_CSS
 
 load_dotenv()
@@ -1590,10 +1591,11 @@ render_sidebar(data, brief, last_updated, health_summary, preferences, alerts, a
 render_decision_bar(analytics)
 
 # ─── 5 sekme ─────────────────────────────────────────────────────────────────
-tabs = st.tabs(["Terminal", "Macro", "Sinyaller", "Raporlar", "Atlas"])
+tabs = st.tabs(["Terminal", "Macro", "Sinyaller", "Raporlar", "Atlas", "On-Chain"])
 with tabs[0]: render_overview_tab(data, brief, analytics, alerts, health_summary)
 with tabs[1]: render_macro_tab(data, analytics)
 with tabs[2]: render_signals_tab(data, health_summary)
 with tabs[3]: render_report_tab(client, data, brief, analytics, alerts, health_summary, preferences.get("report_depth", "Orta"))
 with tabs[4]: render_all_metrics_tab(data)
+with tabs[5]: render_onchain_tab()
 
