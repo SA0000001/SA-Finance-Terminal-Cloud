@@ -302,7 +302,7 @@ def _plotly_layout(title: str, height: int) -> dict:
             font=dict(
                 family="IBM Plex Mono, Courier New, monospace",
                 size=11,
-                color="rgb(5,13,24)",
+                color="rgb(238,243,250)",
             ),
         ),
     )
@@ -380,7 +380,7 @@ def _oc_chart(
                 font=dict(
                     family="IBM Plex Mono, Courier New, monospace",
                     size=11,
-                    color="rgb(5,13,24)",
+                    color="rgb(238,243,250)",
                 ),
             ),
         )
@@ -437,7 +437,7 @@ def _oc_dual_axis_chart(
         hoverlabel=dict(
             bgcolor="rgb(255,255,255)",
             bordercolor=_C_ACCENT,
-            font=dict(family="IBM Plex Mono, Courier New, monospace", size=11, color="rgb(5,13,24)"),
+            font=dict(family="IBM Plex Mono, Courier New, monospace", size=11, color="rgb(238,243,250)"),
         ),
     ))
 
@@ -453,7 +453,7 @@ def _oc_dual_axis_chart(
             hoverlabel=dict(
                 bgcolor="rgb(255,255,255)",
                 bordercolor=_C_POSITIVE,
-                font=dict(family="IBM Plex Mono, Courier New, monospace", size=11, color="rgb(5,13,24)"),
+                font=dict(family="IBM Plex Mono, Courier New, monospace", size=11, color="rgb(238,243,250)"),
             ),
         ))
         layout["yaxis2"] = dict(
