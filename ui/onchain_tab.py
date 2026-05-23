@@ -210,11 +210,18 @@ def _try_line_chart(df: pd.DataFrame, cols: list[str], title: str, height: int =
     if "time" in chart_df.columns:
         chart_df["time"] = pd.to_datetime(chart_df["time"], errors="coerce")
         chart_df = chart_df[chart_df["time"] >= _CHART_START]
+        chart_df = chart_df.dropna(subset=["time"])
+        chart_df = chart_df.sort_values("time")
         chart_df = chart_df.set_index("time")
-    chart_df = chart_df.replace([float("inf"), float("-inf")], None).dropna(how="all")
-    if chart_df.empty:
+    chart_df = chart_df.replace([float("inf"), float("-inf")], None)
+    # Drop columns that are entirely NaN (would show as "insufficient data")
+    chart_df = chart_df.dropna(axis=1, how="all")
+    chart_df = chart_df.dropna(how="all")
+    if chart_df.empty or len(chart_df.columns) == 0:
         st.caption(f"ℹ {title}: no data to display")
         return
+    # Show title with remaining column count
+    col_label = ", ".join(str(c) for c in chart_df.columns[:3])
     st.markdown(
         f"<div style='font-family:var(--font-mono);font-size:0.62rem;"
         f"letter-spacing:0.12em;text-transform:uppercase;"
@@ -547,8 +554,20 @@ def _load_and_compute(force_refresh: bool = False):
             if "time" in df_sorted.columns:
                 df_sorted["time"] = pd.to_datetime(df_sorted["time"], errors="coerce")
                 df_sorted = df_sorted.sort_values("time").reset_index(drop=True)
-            df_computed = _compute_metrics(df_sorted, usdt_df, usdc_df, warnings_tmp, derived_tmp)
-        except Exception:  # noqa: BLE001
+            # Normalize stable DFs time columns to same dtype before passing to _compute_metrics
+            def _ensure_datetime(sdf):
+                if sdf is None or sdf.empty:
+                    return sdf
+                s = sdf.copy()
+                if "time" in s.columns:
+                    s["time"] = pd.to_datetime(s["time"], errors="coerce")
+                return s
+            usdt_df_norm = _ensure_datetime(usdt_df)
+            usdc_df_norm = _ensure_datetime(usdc_df)
+            df_computed = _compute_metrics(df_sorted, usdt_df_norm, usdc_df_norm, warnings_tmp, derived_tmp)
+        except Exception as _exc:  # noqa: BLE001
+            import traceback
+            traceback.print_exc()
             df_computed = btc_r.df.copy()
 
     return oc, btc_r, usdt_r, usdc_r, df_computed
