@@ -293,12 +293,17 @@ def _plotly_layout(title: str, height: int) -> dict:
             tickfont=dict(family=_FONT_MONO, size=9, color=_C_MUTED),
             showline=False,
         ),
-        hovermode="x unified",
+        hovermode="x",
         hoverlabel=dict(
-            bgcolor="white",
-            bordercolor="#52c8ff",
+            bgcolor="rgb(255,255,255)",
+            bordercolor="rgb(82,200,255)",
             namelength=-1,
-            font=dict(family="IBM Plex Mono, Courier New, monospace", size=11, color="#050d18"),
+            align="left",
+            font=dict(
+                family="IBM Plex Mono, Courier New, monospace",
+                size=11,
+                color="rgb(5,13,24)",
+            ),
         ),
     )
 
@@ -369,6 +374,15 @@ def _oc_chart(
             line=dict(color=color, width=1.5),
             yaxis=yaxis,
             hovertemplate=f"<b>{label}</b>: %{{y:.4f}}<extra></extra>",
+            hoverlabel=dict(
+                bgcolor="rgb(255,255,255)",
+                bordercolor=color,
+                font=dict(
+                    family="IBM Plex Mono, Courier New, monospace",
+                    size=11,
+                    color="rgb(5,13,24)",
+                ),
+            ),
         )
         if fill_first and i == 0:
             trace_kwargs["fill"] = "tozeroy"
@@ -420,6 +434,11 @@ def _oc_dual_axis_chart(
         line=dict(color=_C_ACCENT, width=1.8),
         yaxis="y1",
         hovertemplate=f"<b>{_COL_LABELS.get(col_primary, col_primary)}</b>: $%{{y:,.0f}}<extra></extra>",
+        hoverlabel=dict(
+            bgcolor="rgb(255,255,255)",
+            bordercolor=_C_ACCENT,
+            font=dict(family="IBM Plex Mono, Courier New, monospace", size=11, color="rgb(5,13,24)"),
+        ),
     ))
 
     # Secondary (right axis)
@@ -431,6 +450,11 @@ def _oc_dual_axis_chart(
             line=dict(color=_C_POSITIVE, width=1.4, dash="dot"),
             yaxis="y2",
             hovertemplate=f"<b>{_COL_LABELS.get(col_secondary, col_secondary)}</b>: $%{{y:,.0f}}<extra></extra>",
+            hoverlabel=dict(
+                bgcolor="rgb(255,255,255)",
+                bordercolor=_C_POSITIVE,
+                font=dict(family="IBM Plex Mono, Courier New, monospace", size=11, color="rgb(5,13,24)"),
+            ),
         ))
         layout["yaxis2"] = dict(
             overlaying="y", side="right", showgrid=False,
