@@ -1061,6 +1061,26 @@ def fetch_live_market_cap_segments():
                 result["TOTAL3_CAP_NUM"] = total3_num
                 LOGGER.warning("TOTAL3 TradingView'dan gelmedi; TOTAL + BTC.D + ETH.D ile hesaplandi.")
 
+        # ── Dominance fallback: TradingView scrape parse basarisizsa CoinGecko'dan al ──
+        # TradingView cap verileri geldi ama BTC.D / ETH.D parse edilemedi.
+        # CoinGecko market_cap_percentage TW metodolojisine Coinpaprika'dan cok daha yakin.
+        if result["BTC_DOM_TV"] == PLACEHOLDER:
+            try:
+                cg_dom_response = safe_fetch_json(
+                    "CoinGecko Global (dom fallback)",
+                    "https://api.coingecko.com/api/v3/global",
+                    timeout=6,
+                    headers=HEADERS,
+                )
+                cg_data = cg_dom_response.payload["data"]["market_cap_percentage"]
+                result["BTC_DOM_TV"] = f"%{float(cg_data['btc']):.2f}"
+                result["ETH_DOM_TV"] = f"%{float(cg_data['eth']):.2f}"
+                result["DOM_SOURCE"] = "CoinGecko"
+                health.success("CoinGecko Global (dom fallback)", cg_dom_response.latency_ms)
+                LOGGER.info("BTC.D / ETH.D TradingView'dan alinamadi; CoinGecko fallback kullanildi.")
+            except Exception as exc:
+                LOGGER.warning("CoinGecko dominance fallback hatasi: %s", exc)
+
         if len(tradingview_parsed) == len(cap_symbols):
             health.success("TradingView Market Cap", latency, stale_after_seconds=300)
         else:
