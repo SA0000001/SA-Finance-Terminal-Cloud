@@ -1127,6 +1127,13 @@ def fetch_live_market_cap_segments():
             "TOTAL3_CAP_NUM": total3_num,
             "OTHERS_CAP_NUM": others_num,
             "TOTAL_CAP_SOURCE": "CoinGecko fallback",
+            # BTC_DOM_TV / ETH_DOM_TV burada set edilirse FIX 3 override'ı devreye girer.
+            # CoinGecko market_cap_percentage TradingView metodolojisine Coinpaprika'dan
+            # çok daha yakın; Jina/TradingView scrape başarısız olduğunda bu değerler
+            # Dom / ETH_Dom'un doğru gösterilmesini sağlar.
+            "BTC_DOM_TV": f"%{btc_d:.2f}",
+            "ETH_DOM_TV": f"%{eth_d:.2f}",
+            "DOM_SOURCE": "CoinGecko",
         }
         health.success("CoinGecko Global", global_response.latency_ms)
         health.success("CoinGecko Top10", top10_response.latency_ms)
@@ -2376,12 +2383,15 @@ def load_terminal_data(fred_api_key=""):
     ]
     data = _merge_result_payloads(*normalized_payloads)
 
-    # ── FIX 3: BTC.D / ETH.D → TradingView değerleriyle override ──────────────
+    # ── FIX 3: BTC.D / ETH.D → TradingView / CoinGecko değerleriyle override ──
     # Coinpaprika'nın hesabı TradingView'dan 0.1–0.5% sapabilir.
     # fetch_live_market_cap_segments'ten gelen BTC_DOM_TV / ETH_DOM_TV varsa öncelikli kullan.
+    # DOM_SOURCE zaten market_cap payload'ından gelir (TradingView veya CoinGecko).
     if data.get("BTC_DOM_TV") and data["BTC_DOM_TV"] != PLACEHOLDER:
         data["Dom"] = data["BTC_DOM_TV"]
-        data["DOM_SOURCE"] = "TradingView"
+        # DOM_SOURCE market_cap payload'ından merge edilmiş olur; yoksa varsayılan koy
+        if not data.get("DOM_SOURCE") or data["DOM_SOURCE"] == PLACEHOLDER:
+            data["DOM_SOURCE"] = "CoinGecko"
     if data.get("ETH_DOM_TV") and data["ETH_DOM_TV"] != PLACEHOLDER:
         data["ETH_Dom"] = data["ETH_DOM_TV"]
 
