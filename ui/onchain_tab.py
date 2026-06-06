@@ -994,7 +994,7 @@ def _render_manual_sidebar_form() -> None:
     # ── Grup 2: Exchange & Derivatives ───────────────────────────────────
     st.sidebar.markdown("**Exchange & Derivatives**")
     ex_netflow   = st.sidebar.number_input(METRIC_LABELS["exchange_netflow"],    value=float(existing.get("exchange_netflow") or 0.0),    step=100.0,  format="%.0f",  help=METRIC_HELP["exchange_netflow"],    key="moc_ex_netflow")
-    ex_reserve   = st.sidebar.number_input(METRIC_LABELS["exchange_reserve"],    value=float(existing.get("exchange_reserve") or 0.0),    step=1000.0, format="%.0f",  help=METRIC_HELP["exchange_reserve"],    key="moc_ex_reserve")
+    ex_reserve   = st.sidebar.number_input(METRIC_LABELS["exchange_reserve"],    value=float(existing.get("exchange_reserve") or 0.0),    step=0.01,   format="%.2f",  help=METRIC_HELP["exchange_reserve"],    key="moc_ex_reserve")
     funding      = st.sidebar.number_input(METRIC_LABELS["funding_rate"],        value=float(existing.get("funding_rate") or 0.0),        step=0.001,  format="%.4f",  help=METRIC_HELP["funding_rate"],        key="moc_funding")
     oi           = st.sidebar.number_input(METRIC_LABELS["open_interest"],       value=float(existing.get("open_interest") or 0.0),       step=0.1,    format="%.2f",  help=METRIC_HELP["open_interest"],       key="moc_oi")
     long_liq     = st.sidebar.number_input(METRIC_LABELS["long_liquidations"],   value=float(existing.get("long_liquidations") or 0.0),   step=1.0,    format="%.1f",  help=METRIC_HELP["long_liquidations"],   key="moc_long_liq")
@@ -1180,8 +1180,8 @@ def _render_manual_dashboard(entry: dict) -> None:
         ("Exchange Netflow", f"{ex_netflow:+,.0f} BTC" if ex_netflow is not None else "N/A",
          _netflow_label(ex_netflow),
          _signal_color(ex_netflow, bear_above=0, bull_below=0)),
-        ("Exchange Reserve", f"{ex_reserve:,.0f} BTC" if ex_reserve else "N/A",
-         "Toplam borsa", ""),
+        ("Exchange Reserve", f"${ex_reserve:.2f}M" if ex_reserve else "N/A",
+         "USD milyon", ""),
         ("Funding Rate",     f"{funding:+.4f}%" if funding is not None else "N/A",
          _funding_label(funding),
          _signal_color(funding, bear_above=0.05, bull_below=-0.01)),
@@ -1546,15 +1546,15 @@ def _compute_manual_score(entry: dict) -> tuple[int, dict[str, int], list[str], 
 
     ex_reserve = _g("exchange_reserve")
     if ex_reserve is not None:
-        # Mutlak değer yerine trend proxy: çok düşük rezerv yapısal olumlu
-        if ex_reserve < 2_200_000:
-            s = 80; pos.append(f"Exchange reserve {ex_reserve:,.0f} BTC — Tarihsel düşük, arz sıkışması")
-        elif ex_reserve < 2_600_000:
+        # USD milyon cinsinden eşikler (örn. 2.72M = 2.72)
+        if ex_reserve < 2.0:
+            s = 80; pos.append(f"Exchange reserve ${ex_reserve:.2f}M — Tarihsel düşük, arz sıkışması")
+        elif ex_reserve < 2.5:
             s = 65
-        elif ex_reserve < 3_000_000:
+        elif ex_reserve < 3.0:
             s = 48
         else:
-            s = 30; neg.append(f"Exchange reserve {ex_reserve:,.0f} BTC — Yüksek borsa arzı")
+            s = 30; neg.append(f"Exchange reserve ${ex_reserve:.2f}M — Yüksek borsa arzı")
         c_scores.append((s, 0.45))
 
     layer_c = int(round(sum(s * w for s, w in c_scores) / sum(w for _, w in c_scores))) if c_scores else 50
@@ -1787,7 +1787,7 @@ def _render_history_table() -> None:
             "Realized P.":     f"${e['realized_price']:,.0f}" if e.get("realized_price")  else "—",
             "STH P&L":         f"{e['sth_rpl']:+.2f}%"    if e.get("sth_rpl")         is not None else "—",
             "Netflow (BTC)":   f"{e['exchange_netflow']:+,.0f}" if e.get("exchange_netflow") is not None else "—",
-            "Reserve (BTC)":   f"{e['exchange_reserve']:,.0f}" if e.get("exchange_reserve") else "—",
+            "Reserve ($M)":    f"${e['exchange_reserve']:.2f}M" if e.get("exchange_reserve") else "—",
             "Funding":         f"{e['funding_rate']:+.4f}%" if e.get("funding_rate")   is not None else "—",
             "OI ($B)":         f"{e['open_interest']:.2f}"  if e.get("open_interest")  is not None else "—",
             "Long Liq ($M)":   f"{e['long_liquidations']:.1f}"  if e.get("long_liquidations")  is not None else "—",
