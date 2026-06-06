@@ -21,6 +21,19 @@ from services.onchain_data import (
     SOURCE_STATUS_UNAVAILABLE,
     load_all_onchain,
 )
+from services.onchain_manual import (
+    METRIC_HELP,
+    METRIC_KEYS,
+    METRIC_LABELS,
+    delete_entry,
+    entry_count,
+    get_metric_safe,
+    has_today_entry,
+    load_all_entries,
+    load_entry,
+    load_latest_entry,
+    save_entry,
+)
 from ui.components import esc
 
 
@@ -935,25 +948,949 @@ def _load_and_compute(force_refresh: bool = False):
     return oc, btc_r, usdt_r, usdc_r, df_computed
 
 
+# ─── Manuel mod: Sidebar form ────────────────────────────────────────────────
+
+def _render_manual_sidebar_form() -> None:
+    """
+    Sidebar'da günlük on-chain metrik giriş formu.
+    Yalnızca Manuel Mod aktifken çağrılır.
+    """
+    from datetime import date as _date
+
+    st.sidebar.markdown("---")
+    st.sidebar.markdown(
+        "<div style='font-family:var(--font-mono);font-size:0.65rem;"
+        "letter-spacing:0.14em;text-transform:uppercase;"
+        "color:var(--accent);margin-bottom:6px'>📊 On-Chain Veri Girişi</div>",
+        unsafe_allow_html=True,
+    )
+
+    # Tarih seçici
+    entry_date = st.sidebar.date_input(
+        "Tarih",
+        value=_date.today(),
+        help="Hangi güne ait veri giriyorsunuz?",
+    ).isoformat()  # type: ignore[union-attr]
+
+    # Mevcut kaydı yükle (ön-doldurmak için)
+    existing = load_entry(entry_date) or {}
+
+    st.sidebar.markdown(
+        "<div style='font-size:0.62rem;color:var(--text-muted);margin:4px 0 8px'>CryptoQuant / Glassnode'dan alınan değerleri girin.</div>",
+        unsafe_allow_html=True,
+    )
+
+    # ── Grup 1: Valuation ─────────────────────────────────────────────────
+    st.sidebar.markdown("**Valuation**")
+    nupl       = st.sidebar.number_input(METRIC_LABELS["nupl"],            value=float(existing.get("nupl") or 0.0),          step=0.001,  format="%.4f",  help=METRIC_HELP["nupl"],            key="moc_nupl")
+    sopr       = st.sidebar.number_input(METRIC_LABELS["sopr"],            value=float(existing.get("sopr") or 1.0),          step=0.001,  format="%.4f",  help=METRIC_HELP["sopr"],            key="moc_sopr")
+    mvrv       = st.sidebar.number_input(METRIC_LABELS["mvrv"],            value=float(existing.get("mvrv") or 1.0),          step=0.01,   format="%.4f",  help=METRIC_HELP["mvrv"],            key="moc_mvrv")
+    mvrv_z     = st.sidebar.number_input(METRIC_LABELS["mvrv_z_score"],    value=float(existing.get("mvrv_z_score") or 0.0),  step=0.1,    format="%.4f",  help=METRIC_HELP["mvrv_z_score"],    key="moc_mvrv_z")
+    lth_cb     = st.sidebar.number_input(METRIC_LABELS["lth_cost_basis"],  value=float(existing.get("lth_cost_basis") or 0.0),  step=100.0, format="%.0f", help=METRIC_HELP["lth_cost_basis"],  key="moc_lth_cb")
+    sth_cb     = st.sidebar.number_input(METRIC_LABELS["sth_cost_basis"],  value=float(existing.get("sth_cost_basis") or 0.0),  step=100.0, format="%.0f", help=METRIC_HELP["sth_cost_basis"],  key="moc_sth_cb")
+    realized_p = st.sidebar.number_input(METRIC_LABELS["realized_price"],  value=float(existing.get("realized_price") or 0.0),  step=100.0, format="%.0f", help=METRIC_HELP["realized_price"],  key="moc_realized_p")
+    sth_rpl    = st.sidebar.number_input(METRIC_LABELS["sth_rpl"],         value=float(existing.get("sth_rpl") or 0.0),       step=0.1,    format="%.2f",  help=METRIC_HELP["sth_rpl"],         key="moc_sth_rpl")
+
+    # ── Grup 2: Exchange & Derivatives ───────────────────────────────────
+    st.sidebar.markdown("**Exchange & Derivatives**")
+    ex_netflow   = st.sidebar.number_input(METRIC_LABELS["exchange_netflow"],    value=float(existing.get("exchange_netflow") or 0.0),    step=100.0,  format="%.0f",  help=METRIC_HELP["exchange_netflow"],    key="moc_ex_netflow")
+    ex_reserve   = st.sidebar.number_input(METRIC_LABELS["exchange_reserve"],    value=float(existing.get("exchange_reserve") or 0.0),    step=1000.0, format="%.0f",  help=METRIC_HELP["exchange_reserve"],    key="moc_ex_reserve")
+    funding      = st.sidebar.number_input(METRIC_LABELS["funding_rate"],        value=float(existing.get("funding_rate") or 0.0),        step=0.001,  format="%.4f",  help=METRIC_HELP["funding_rate"],        key="moc_funding")
+    oi           = st.sidebar.number_input(METRIC_LABELS["open_interest"],       value=float(existing.get("open_interest") or 0.0),       step=0.1,    format="%.2f",  help=METRIC_HELP["open_interest"],       key="moc_oi")
+    long_liq     = st.sidebar.number_input(METRIC_LABELS["long_liquidations"],   value=float(existing.get("long_liquidations") or 0.0),   step=1.0,    format="%.1f",  help=METRIC_HELP["long_liquidations"],   key="moc_long_liq")
+    short_liq    = st.sidebar.number_input(METRIC_LABELS["short_liquidations"],  value=float(existing.get("short_liquidations") or 0.0),  step=1.0,    format="%.1f",  help=METRIC_HELP["short_liquidations"],  key="moc_short_liq")
+    cb_prem      = st.sidebar.number_input(METRIC_LABELS["coinbase_premium"],    value=float(existing.get("coinbase_premium") or 0.0),    step=0.01,   format="%.4f",  help=METRIC_HELP["coinbase_premium"],    key="moc_cb_prem")
+    etf_flow     = st.sidebar.number_input(METRIC_LABELS["etf_flow_cumulative"], value=float(existing.get("etf_flow_cumulative") or 0.0), step=0.1,    format="%.2f",  help=METRIC_HELP["etf_flow_cumulative"], key="moc_etf_flow")
+
+    # ── Not ───────────────────────────────────────────────────────────────
+    notes = st.sidebar.text_area("Not (opsiyonel)", value=existing.get("notes") or "", height=60, key="moc_notes")
+
+    # ── Kaydet butonu ─────────────────────────────────────────────────────
+    col_save, col_clear = st.sidebar.columns(2)
+    with col_save:
+        if st.button("💾 Kaydet", use_container_width=True, key="moc_save_btn"):
+            entry = {
+                "nupl":                nupl,
+                "sopr":                sopr,
+                "mvrv":                mvrv,
+                "mvrv_z_score":        mvrv_z,
+                "lth_cost_basis":      lth_cb     if lth_cb     != 0.0 else None,
+                "sth_cost_basis":      sth_cb     if sth_cb     != 0.0 else None,
+                "realized_price":      realized_p if realized_p != 0.0 else None,
+                "sth_rpl":             sth_rpl,
+                "exchange_netflow":    ex_netflow,
+                "exchange_reserve":    ex_reserve if ex_reserve != 0.0 else None,
+                "funding_rate":        funding,
+                "open_interest":       oi         if oi         != 0.0 else None,
+                "long_liquidations":   long_liq   if long_liq   != 0.0 else None,
+                "short_liquidations":  short_liq  if short_liq  != 0.0 else None,
+                "coinbase_premium":    cb_prem,
+                "etf_flow_cumulative": etf_flow   if etf_flow   != 0.0 else None,
+                "notes":               notes.strip() or None,
+            }
+            save_entry(entry, entry_date)
+            st.sidebar.success(f"✓ {entry_date} kaydedildi")
+            st.rerun()
+    with col_clear:
+        if st.button("🗑 Sil", use_container_width=True, key="moc_del_btn"):
+            if delete_entry(entry_date):
+                st.sidebar.warning(f"{entry_date} silindi")
+                st.rerun()
+
+
+# ─── Manuel mod: Dashboard render ────────────────────────────────────────────
+
+def _signal_color(value: Optional[float], bull_above: Optional[float] = None,
+                   bear_above: Optional[float] = None, bull_below: Optional[float] = None,
+                   bear_below: Optional[float] = None) -> str:
+    """Basit renk mantığı: bull → positive, bear → negative, nötr → text-primary."""
+    if value is None:
+        return "var(--text-muted)"
+    if bull_below is not None and value < bull_below:
+        return "var(--positive)"
+    if bear_above is not None and value > bear_above:
+        return "var(--negative)"
+    if bull_above is not None and value > bull_above:
+        return "var(--positive)"
+    if bear_below is not None and value < bear_below:
+        return "var(--negative)"
+    return "var(--text-primary)"
+
+
+def _render_manual_dashboard(entry: dict) -> None:
+    """Manuel girdi dict'inden on-chain dashboard paneli oluştur."""
+
+    def _gm(key: str) -> Optional[float]:
+        return get_metric_safe(entry, key)
+
+    saved_at = entry.get("_saved_at", "?")
+    entry_date_display = entry.get("_date", saved_at)
+
+    # ── Başlık bandı ──────────────────────────────────────────────────────
+    st.markdown(
+        f"<div style='display:flex;align-items:center;gap:12px;flex-wrap:wrap;"
+        f"padding:8px 14px;border-radius:var(--r-sm);border:1px solid var(--border);"
+        f"background:rgba(82,200,255,0.05);margin-bottom:12px'>"
+        f"<span style='font-family:var(--font-mono);font-size:0.62rem;"
+        f"color:var(--accent);letter-spacing:0.1em'>MANUEL MOD</span>"
+        f"<span style='font-family:var(--font-mono);font-size:0.68rem;"
+        f"color:var(--text-muted)'>Kayıt: {esc(saved_at)} UTC</span>"
+        f"<span style='font-family:var(--font-mono);font-size:0.62rem;"
+        f"color:var(--text-muted)'>Toplam kayıt: {entry_count()}</span>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+    # ── Valuation paneli ──────────────────────────────────────────────────
+    _section_header("Valuation Layer", "Valuation · Manuel Giriş")
+
+    nupl       = _gm("nupl")
+    sopr       = _gm("sopr")
+    mvrv       = _gm("mvrv")
+    mvrv_z     = _gm("mvrv_z_score")
+    lth_cb     = _gm("lth_cost_basis")
+    sth_cb     = _gm("sth_cost_basis")
+    realized_p = _gm("realized_price")
+    sth_rpl    = _gm("sth_rpl")
+
+    def _nupl_zone(v: Optional[float]) -> str:
+        if v is None: return ""
+        if v < 0:     return "Loss Zone"
+        if v < 0.25:  return "Hope"
+        if v < 0.50:  return "Belief"
+        if v < 0.75:  return "Euphoria"
+        return "Greed / Top"
+
+    def _mvrv_zone(v: Optional[float]) -> str:
+        if v is None: return ""
+        if v < 1.0:   return "Ucuz / Akümülasyon"
+        if v < 2.4:   return "Normal"
+        if v < 3.7:   return "Dikkat"
+        return "Aşırı Isınma"
+
+    def _mvrv_z_zone(v: Optional[float]) -> str:
+        if v is None: return ""
+        if v < 0:     return "Dip Bölgesi"
+        if v < 3:     return "Nötr"
+        if v < 7:     return "Dikkat"
+        return "Aşırı Isınma"
+
+    def _sth_rpl_label(v: Optional[float]) -> str:
+        if v is None: return ""
+        return "Kârda ✓" if v >= 0 else "Zararda"
+
+    val_items = [
+        ("NUPL",            _fmt_num(nupl, 4)       if nupl      is not None else "N/A",
+         _nupl_zone(nupl),
+         _signal_color(nupl, bear_above=0.5, bull_below=0.25)),
+        ("SOPR",            _fmt_num(sopr, 4)       if sopr      is not None else "N/A",
+         "Spent Output P/R",
+         _signal_color(sopr, bull_above=1.001, bear_below=0.98)),
+        ("MVRV Ratio",      _fmt_num(mvrv, 4)       if mvrv      is not None else "N/A",
+         _mvrv_zone(mvrv),
+         _signal_color(mvrv, bear_above=3.7, bull_below=1.0)),
+        ("MVRV Z-Score",    _fmt_num(mvrv_z, 4)     if mvrv_z    is not None else "N/A",
+         _mvrv_z_zone(mvrv_z),
+         _signal_color(mvrv_z, bear_above=7.0, bull_below=0.0)),
+        ("LTH Cost Basis",  _fmt_usd(lth_cb, 0)     if lth_cb    else "N/A",
+         "BTC Cost Basis LTH", ""),
+        ("STH Cost Basis",  _fmt_usd(sth_cb, 0)     if sth_cb    else "N/A",
+         "BTC Cost Basis STH", ""),
+        ("Realized Price",  _fmt_usd(realized_p, 0) if realized_p else "N/A",
+         "Tüm coin ortalama", ""),
+        ("STH P&L",         f"{sth_rpl:+.2f}%"      if sth_rpl   is not None else "N/A",
+         _sth_rpl_label(sth_rpl),
+         _signal_color(sth_rpl, bull_above=0, bear_below=-5)),
+    ]
+    _render_metric_row(val_items, cols=4)
+
+    st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
+
+    # ── Exchange & Derivatives paneli ────────────────────────────────────
+    _section_header("Exchange & Derivatives Layer", "Exchange Flow · Türev Piyasa · Manuel Giriş")
+
+    ex_netflow = _gm("exchange_netflow")
+    ex_reserve = _gm("exchange_reserve")
+    funding    = _gm("funding_rate")
+    oi         = _gm("open_interest")
+    long_liq   = _gm("long_liquidations")
+    short_liq  = _gm("short_liquidations")
+    cb_prem    = _gm("coinbase_premium")
+    etf_flow   = _gm("etf_flow_cumulative")
+
+    def _netflow_label(v: Optional[float]) -> str:
+        if v is None: return ""
+        return "Çıkış (bullish)" if v < 0 else "Giriş (satış baskısı)"
+
+    def _funding_label(v: Optional[float]) -> str:
+        if v is None: return ""
+        if v > 0.05:  return "Aşırı Long / Overcrowding"
+        if v > 0.01:  return "Long ağırlıklı"
+        if v < -0.01: return "Short ağırlıklı"
+        return "Nötr / Sağlıklı"
+
+    def _liq_label(long: Optional[float], short: Optional[float]) -> str:
+        if long is None or short is None: return ""
+        ratio = long / short if short > 0 else 0
+        if ratio > 3:   return "Long Flush ⚠"
+        if ratio < 0.33: return "Short Squeeze"
+        return "Dengeli"
+
+    exd_items = [
+        ("Exchange Netflow", f"{ex_netflow:+,.0f} BTC" if ex_netflow is not None else "N/A",
+         _netflow_label(ex_netflow),
+         _signal_color(ex_netflow, bear_above=0, bull_below=0)),
+        ("Exchange Reserve", f"{ex_reserve:,.0f} BTC" if ex_reserve else "N/A",
+         "Toplam borsa", ""),
+        ("Funding Rate",     f"{funding:+.4f}%" if funding is not None else "N/A",
+         _funding_label(funding),
+         _signal_color(funding, bear_above=0.05, bull_below=-0.01)),
+        ("Open Interest",    f"${oi:.2f}B" if oi else "N/A",
+         "USD milyar", ""),
+        ("Long Liquidations",  f"${long_liq:.1f}M" if long_liq else "N/A",
+         "Long Flush riski",
+         "var(--negative)" if long_liq and long_liq > 100 else "var(--text-primary)"),
+        ("Short Liquidations", f"${short_liq:.1f}M" if short_liq else "N/A",
+         "Short Squeeze sinyali",
+         "var(--positive)" if short_liq and short_liq > 100 else "var(--text-primary)"),
+    ]
+    _render_metric_row(exd_items, cols=3)
+
+    # Liquidation balance bar
+    if long_liq and short_liq and (long_liq + short_liq) > 0:
+        total_liq = long_liq + short_liq
+        long_pct  = long_liq / total_liq * 100
+        short_pct = short_liq / total_liq * 100
+        liq_label = _liq_label(long_liq, short_liq)
+        liq_color = "var(--negative)" if long_pct > 65 else ("var(--positive)" if short_pct > 65 else "var(--accent)")
+        st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
+        st.markdown(
+            f"<div style='padding:10px 14px;border-radius:var(--r-sm);"
+            f"border:1px solid var(--border);background:rgba(255,255,255,0.02)'>"
+            f"<div style='font-family:var(--font-mono);font-size:0.60rem;"
+            f"letter-spacing:0.12em;text-transform:uppercase;"
+            f"color:var(--text-muted);margin-bottom:6px'>LİKİDASYON DAĞILIMI (24s)</div>"
+            f"<div style='display:flex;gap:0;border-radius:3px;overflow:hidden;height:14px'>"
+            f"<div style='width:{long_pct:.1f}%;background:rgba(255,95,114,0.7);'></div>"
+            f"<div style='width:{short_pct:.1f}%;background:rgba(50,217,140,0.7);'></div>"
+            f"</div>"
+            f"<div style='display:flex;justify-content:space-between;"
+            f"font-family:var(--font-mono);font-size:0.68rem;margin-top:4px'>"
+            f"<span style='color:var(--negative)'>Long {long_pct:.1f}% (${long_liq:.0f}M)</span>"
+            f"<span style='color:{liq_color};font-weight:600'>{liq_label}</span>"
+            f"<span style='color:var(--positive)'>Short {short_pct:.1f}% (${short_liq:.0f}M)</span>"
+            f"</div></div>",
+            unsafe_allow_html=True,
+        )
+
+    # Coinbase Premium + ETF Flow
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+    inst_items = [
+        ("Coinbase Premium", f"{cb_prem:+.4f}" if cb_prem is not None else "N/A",
+         "Pozitif = ABD kurumsal alımı",
+         _signal_color(cb_prem, bull_above=0.01, bear_below=-0.05)),
+        ("Kümülatif ETF Flow", f"${etf_flow:.1f}B" if etf_flow else "N/A",
+         "USD milyar", ""),
+    ]
+    _render_metric_row(inst_items, cols=4)
+
+    st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
+
+    # ── BCRM-14 Skor Paneli ───────────────────────────────────────────────
+    _section_header("SA Finance Alpha BTC Core-14", "BCRM Skor · Rejim · Katman Analizi")
+
+    main_score, layer_scores, pos_d, neg_d = _compute_manual_score(entry)
+    risk_flags = _compute_risk_flags(entry)
+
+    # Rejim etiket
+    if main_score <= 20:
+        regime = "Capitulation / Deep Bearish"
+        regime_color = "var(--negative)"
+    elif main_score <= 40:
+        regime = "Defensive Bearish"
+        regime_color = "#ff8c42"
+    elif main_score <= 60:
+        regime = "Neutral / Mixed"
+        regime_color = "var(--text-muted)"
+    elif main_score <= 75:
+        regime = "Constructive Bullish"
+        regime_color = "var(--positive)"
+    elif main_score <= 85:
+        regime = "Strong Bullish"
+        regime_color = "#00e5b4"
+    else:
+        regime = "Overheated / Distribution Risk"
+        regime_color = "#f5c518"
+
+    # Ana skor kartı
+    st.markdown(
+        f"<div style='display:flex;align-items:center;gap:20px;flex-wrap:wrap;"
+        f"padding:14px 18px;border-radius:var(--r-sm);"
+        f"border:1px solid {regime_color}33;"
+        f"background:linear-gradient(135deg,{regime_color}08,transparent);margin-bottom:12px'>"
+        f"<div>"
+        f"<div style='font-family:var(--font-mono);font-size:0.58rem;letter-spacing:0.18em;"
+        f"text-transform:uppercase;color:var(--text-muted);margin-bottom:3px'>BCRM SKORU</div>"
+        f"<div style='font-family:var(--font-mono);font-size:2.2rem;font-weight:700;"
+        f"color:{regime_color};line-height:1'>{main_score}<span style='font-size:1rem;"
+        f"color:var(--text-muted)'>/100</span></div>"
+        f"</div>"
+        f"<div style='flex:1;min-width:180px'>"
+        f"<div style='font-family:var(--font-mono);font-size:0.58rem;letter-spacing:0.14em;"
+        f"text-transform:uppercase;color:var(--text-muted);margin-bottom:3px'>REJİM</div>"
+        f"<div style='font-size:1.05rem;font-weight:600;color:{regime_color}'>{regime}</div>"
+        f"</div>"
+        f"<div>"
+        f"<div style='font-family:var(--font-mono);font-size:0.58rem;letter-spacing:0.14em;"
+        f"text-transform:uppercase;color:var(--text-muted);margin-bottom:3px'>GÜNCELLENDİ</div>"
+        f"<div style='font-family:var(--font-mono);font-size:0.72rem;"
+        f"color:var(--text-muted)'>{esc(entry.get('_saved_at','?'))[:16]} UTC</div>"
+        f"</div>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+    # Katman skorları
+    layer_labels = {
+        "valuation":     ("Değerleme / Döngü",   "25%"),
+        "holder":        ("Holder Davranışı",     "20%"),
+        "exchange":      ("Borsa Arzı / Akış",   "15%"),
+        "derivatives":   ("Türev Piyasa Riski",  "20%"),
+        "institutional": ("Kurumsal Talep",       "20%"),
+    }
+
+    st.markdown(
+        "<div style='font-family:var(--font-mono);font-size:0.60rem;letter-spacing:0.14em;"
+        "text-transform:uppercase;color:var(--text-muted);margin:10px 0 6px'>KATMAN SKORLARI</div>",
+        unsafe_allow_html=True,
+    )
+
+    layer_cols = st.columns(5)
+    for i, (k, (label, weight)) in enumerate(layer_labels.items()):
+        ls = layer_scores.get(k, 50)
+        lc = "var(--positive)" if ls >= 65 else ("var(--negative)" if ls <= 40 else "var(--text-muted)")
+        with layer_cols[i]:
+            st.markdown(
+                f"<div style='text-align:center;padding:10px 6px;"
+                f"border-radius:var(--r-sm);border:1px solid var(--border);"
+                f"background:rgba(255,255,255,0.02)'>"
+                f"<div style='font-family:var(--font-mono);font-size:1.35rem;font-weight:700;"
+                f"color:{lc};line-height:1.1'>{ls}</div>"
+                f"<div style='font-family:var(--font-mono);font-size:0.56rem;"
+                f"color:var(--text-muted);margin-top:2px'>/100</div>"
+                f"<div style='font-size:0.68rem;color:var(--text-secondary);"
+                f"margin-top:4px;line-height:1.3'>{label}</div>"
+                f"<div style='font-family:var(--font-mono);font-size:0.56rem;"
+                f"color:var(--text-muted)'>{weight}</div>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+
+    # Driver özeti
+    st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+    col_pos, col_neg = st.columns(2)
+    with col_pos:
+        st.markdown(
+            "<div style='font-family:var(--font-mono);font-size:0.60rem;"
+            "letter-spacing:0.12em;text-transform:uppercase;"
+            "color:var(--positive);margin-bottom:6px'>✓ Pozitif Sinyaller</div>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            f"<div style='padding:8px 12px;border-radius:var(--r-sm);"
+            f"border:1px solid rgba(50,217,140,0.15);background:rgba(50,217,140,0.04)'>"
+            f"{_driver_list(pos_d, 'positive') or '<span style=\"font-size:0.76rem;color:var(--text-muted)\">Pozitif sinyal yok</span>'}"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+    with col_neg:
+        st.markdown(
+            "<div style='font-family:var(--font-mono);font-size:0.60rem;"
+            "letter-spacing:0.12em;text-transform:uppercase;"
+            "color:var(--negative);margin-bottom:6px'>✗ Negatif Sinyaller</div>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            f"<div style='padding:8px 12px;border-radius:var(--r-sm);"
+            f"border:1px solid rgba(255,95,114,0.15);background:rgba(255,95,114,0.04)'>"
+            f"{_driver_list(neg_d, 'negative') or '<span style=\"font-size:0.76rem;color:var(--text-muted)\">Negatif sinyal yok</span>'}"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+
+    # Risk Bayrakları
+    if risk_flags:
+        st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
+        st.markdown(
+            "<div style='font-family:var(--font-mono);font-size:0.60rem;letter-spacing:0.14em;"
+            "text-transform:uppercase;color:var(--text-muted);margin-bottom:6px'>⚑ RİSK BAYRAKLARI</div>",
+            unsafe_allow_html=True,
+        )
+        flags_html = "".join(
+            f"<span style='display:inline-block;margin:2px 4px 2px 0;"
+            f"padding:3px 10px;border-radius:20px;"
+            f"border:1px solid {color}44;background:{color}11;"
+            f"font-family:var(--font-mono);font-size:0.65rem;color:{color}'>"
+            f"{flag}</span>"
+            for flag, color in risk_flags
+        )
+        st.markdown(
+            f"<div style='padding:8px 12px;border-radius:var(--r-sm);"
+            f"border:1px solid var(--border);background:rgba(255,255,255,0.01)'>"
+            f"{flags_html}</div>",
+            unsafe_allow_html=True,
+        )
+
+    # Not
+    if entry.get("notes"):
+        st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+        st.markdown(
+            f"<div style='font-size:0.76rem;color:var(--text-muted);padding:8px 12px;"
+            f"border-radius:var(--r-sm);border:1px solid var(--border-soft);"
+            f"background:rgba(255,255,255,0.01)'>"
+            f"<span style='font-family:var(--font-mono);font-size:0.58rem;"
+            f"color:var(--text-faint)'>NOT · </span>{esc(entry['notes'])}"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+
+
+def _compute_manual_score(entry: dict) -> tuple[int, dict[str, int], list[str], list[str]]:
+    """
+    BCRM-14 Skor Motoru
+    ====================
+    5 katman → ağırlıklı ana skor (0–100)
+
+    Katmanlar:
+      A) Valuation / Cycle          — 25%  (NUPL, MVRV, MVRV Z-Score, Realized Price)
+      B) Holder Behavior            — 20%  (LTH/STH Cost Basis, SOPR, STH P&L)
+      C) Exchange Flows             — 15%  (Netflow, Reserve)
+      D) Derivatives Risk           — 20%  (Funding, OI, Long/Short Liquidations)
+      E) Institutional Demand       — 20%  (Coinbase Premium, ETF Flow)
+
+    Döndürür: (ana_skor, {katman: skor}, pozitif_driver_listesi, negatif_driver_listesi)
+    """
+    def _g(k: str) -> Optional[float]:
+        return get_metric_safe(entry, k)
+
+    pos: list[str] = []
+    neg: list[str] = []
+
+    # ── Katman A: Valuation / Cycle — 25% ─────────────────────────────────
+    # İç ağırlıklar: NUPL 30%, MVRV 25%, MVRV Z-Score 25%, Realized Price 20%
+    a_scores: list[tuple[float, float]] = []  # (skor, ağırlık)
+
+    nupl = _g("nupl")
+    if nupl is not None:
+        # Sağlıklı bölge 0.25–0.55, aşırı uçlar penalized
+        if nupl < 0:
+            s = 15; neg.append(f"NUPL {nupl:.3f} — Loss Zone, ağır stres")
+        elif nupl < 0.25:
+            s = 40; pos.append(f"NUPL {nupl:.3f} — Hope bölgesi, akümülasyon")
+        elif nupl <= 0.55:
+            s = 75; pos.append(f"NUPL {nupl:.3f} — Sağlıklı orta bant")
+        elif nupl <= 0.70:
+            s = 55; neg.append(f"NUPL {nupl:.3f} — Euphoria, dikkat")
+        else:
+            s = 25; neg.append(f"NUPL {nupl:.3f} — Dağıtım bölgesi, aşırı ısınma")
+        a_scores.append((s, 0.30))
+
+    mvrv = _g("mvrv")
+    if mvrv is not None:
+        if mvrv < 1.0:
+            s = 20; neg.append(f"MVRV {mvrv:.3f} — Piyasa zararla, ayı stresi")
+        elif mvrv < 1.2:
+            s = 45
+        elif mvrv <= 2.4:
+            s = 75; pos.append(f"MVRV {mvrv:.3f} — Yapıcı değerleme bölgesi")
+        elif mvrv <= 3.0:
+            s = 50; neg.append(f"MVRV {mvrv:.3f} — Dikkat bölgesi")
+        else:
+            s = 20; neg.append(f"MVRV {mvrv:.3f} — Pahalı / Aşırı ısınma riski")
+        a_scores.append((s, 0.25))
+
+    mvrv_z = _g("mvrv_z_score")
+    if mvrv_z is not None:
+        if mvrv_z < 0:
+            s = 25; neg.append(f"MVRV Z-Score {mvrv_z:.2f} — Zayıf değerleme")
+        elif mvrv_z <= 1:
+            s = 45
+        elif mvrv_z <= 4:
+            s = 78; pos.append(f"MVRV Z-Score {mvrv_z:.2f} — Sağlıklı bant")
+        elif mvrv_z <= 6:
+            s = 45; neg.append(f"MVRV Z-Score {mvrv_z:.2f} — Dikkat bölgesi")
+        else:
+            s = 15; neg.append(f"MVRV Z-Score {mvrv_z:.2f} — Aşırı ısınma / Tepe riski")
+        a_scores.append((s, 0.25))
+
+    real_p  = _g("realized_price")
+    sth_cb  = _g("sth_cost_basis")
+    lth_cb  = _g("lth_cost_basis")
+    # Realized Price skoru: Fiyat üstünde mi altında mı (proxy: STH basis vs realized)
+    if real_p and sth_cb:
+        if sth_cb > real_p * 1.10:
+            s = 75; pos.append(f"Realized Price: STH basis realized üstünde — piyasa kârlı yapı")
+        elif sth_cb > real_p:
+            s = 62
+        elif sth_cb > real_p * 0.90:
+            s = 40; neg.append(f"Realized Price: STH basis realized'a yakın — sıkışma")
+        else:
+            s = 20; neg.append(f"Realized Price: STH basis realized altında — stres")
+        a_scores.append((s, 0.20))
+
+    layer_a = int(round(sum(s * w for s, w in a_scores) / sum(w for _, w in a_scores))) if a_scores else 50
+
+    # ── Katman B: Holder Behavior — 20% ───────────────────────────────────
+    # İç ağırlıklar: Cost Basis 35%, SOPR 35%, STH P&L 30%
+    b_scores: list[tuple[float, float]] = []
+
+    # Cost Basis: fiyat proxy olarak STH basis kullanıyoruz
+    # LTH üstü = yapısal pozitif (+10), STH üstü = kısa vadeli pozitif (+8)
+    if sth_cb and lth_cb:
+        if sth_cb > lth_cb * 1.05:
+            # STH basis, LTH'nin belirgin üstünde → geç döngü / dikkat
+            s = 45; neg.append(f"STH basis LTH'nin belirgin üstünde — geç döngü sinyali")
+        elif sth_cb > lth_cb:
+            s = 75; pos.append(f"Fiyat > STH Cost Basis > LTH Cost Basis — sağlıklı holder yapısı")
+        elif sth_cb > lth_cb * 0.95:
+            s = 55
+        else:
+            s = 25; neg.append(f"STH basis LTH altında — kısa vadeli holder baskısı")
+        b_scores.append((s, 0.35))
+
+    sopr = _g("sopr")
+    if sopr is not None:
+        if sopr > 1.03:
+            s = 45; neg.append(f"SOPR {sopr:.4f} — Realize profit baskısı")
+        elif sopr >= 1.00:
+            s = 72; pos.append(f"SOPR {sopr:.4f} — Kârlı satış, piyasa sağlıklı")
+        elif sopr >= 0.97:
+            s = 35; neg.append(f"SOPR {sopr:.4f} — Zarar realizasyonu")
+        else:
+            s = 15; neg.append(f"SOPR {sopr:.4f} — Sert capitulation / satış baskısı")
+        b_scores.append((s, 0.35))
+
+    sth_rpl = _g("sth_rpl")
+    if sth_rpl is not None:
+        if sth_rpl < -15:
+            s = 30; neg.append(f"STH P&L {sth_rpl:+.2f}% — Ağır zarar, capitulation bölgesi")
+        elif sth_rpl < 0:
+            s = 45; neg.append(f"STH P&L {sth_rpl:+.2f}% — STH zararda")
+        elif sth_rpl <= 15:
+            s = 70; pos.append(f"STH P&L {sth_rpl:+.2f}% — Kontrollü kâr, sağlıklı")
+        elif sth_rpl <= 30:
+            s = 55
+        else:
+            s = 30; neg.append(f"STH P&L {sth_rpl:+.2f}% — Aşırı kâr realizasyonu riski")
+        b_scores.append((s, 0.30))
+
+    layer_b = int(round(sum(s * w for s, w in b_scores) / sum(w for _, w in b_scores))) if b_scores else 50
+
+    # ── Katman C: Exchange Flows — 15% ────────────────────────────────────
+    # İç ağırlıklar: Netflow 55%, Reserve 45%
+    c_scores: list[tuple[float, float]] = []
+
+    ex_netflow = _g("exchange_netflow")
+    if ex_netflow is not None:
+        if ex_netflow < -3000:
+            s = 85; pos.append(f"Exchange netflow {ex_netflow:+,.0f} BTC — Güçlü çekilme, arz sıkışması")
+        elif ex_netflow < -500:
+            s = 70; pos.append(f"Exchange netflow {ex_netflow:+,.0f} BTC — Net outflow trendi")
+        elif ex_netflow <= 500:
+            s = 52
+        elif ex_netflow <= 2000:
+            s = 35; neg.append(f"Exchange netflow {ex_netflow:+,.0f} BTC — Borsaya giriş artıyor")
+        else:
+            s = 15; neg.append(f"Exchange netflow {ex_netflow:+,.0f} BTC — Güçlü inflow, satış baskısı")
+        c_scores.append((s, 0.55))
+
+    ex_reserve = _g("exchange_reserve")
+    if ex_reserve is not None:
+        # Mutlak değer yerine trend proxy: çok düşük rezerv yapısal olumlu
+        if ex_reserve < 2_200_000:
+            s = 80; pos.append(f"Exchange reserve {ex_reserve:,.0f} BTC — Tarihsel düşük, arz sıkışması")
+        elif ex_reserve < 2_600_000:
+            s = 65
+        elif ex_reserve < 3_000_000:
+            s = 48
+        else:
+            s = 30; neg.append(f"Exchange reserve {ex_reserve:,.0f} BTC — Yüksek borsa arzı")
+        c_scores.append((s, 0.45))
+
+    layer_c = int(round(sum(s * w for s, w in c_scores) / sum(w for _, w in c_scores))) if c_scores else 50
+
+    # ── Katman D: Derivatives Risk — 20% ──────────────────────────────────
+    # İç ağırlıklar: Funding 30%, OI 35%, Liquidations 35%
+    d_scores: list[tuple[float, float]] = []
+
+    funding = _g("funding_rate")
+    if funding is not None:
+        if -0.005 <= funding <= 0.02:
+            s = 72; pos.append(f"Funding {funding:+.4f}% — Nötr/sağlıklı, overcrowding yok")
+        elif funding > 0.05:
+            s = 20; neg.append(f"Funding {funding:+.4f}% — Aşırı long overcrowding")
+        elif funding > 0.02:
+            s = 45; neg.append(f"Funding {funding:+.4f}% — Long ağırlıklı, dikkat")
+        elif funding < -0.02:
+            s = 40; neg.append(f"Funding {funding:+.4f}% — Aşırı short, stres")
+        else:
+            s = 58; pos.append(f"Funding {funding:+.4f}% — Hafif negatif, short squeeze potansiyeli")
+        d_scores.append((s, 0.30))
+
+    oi = _g("open_interest")
+    if oi is not None:
+        # OI tek başına değil, funding ile birlikte yorumlanmalı
+        # Burada mutlak değer eşikleri (milyar USD)
+        if oi < 15:
+            s = 70; pos.append(f"OI ${oi:.1f}B — Kaldıraç temizlenmiş, sağlıklı zemin")
+        elif oi <= 25:
+            s = 58
+        elif oi <= 35:
+            # Yüksek OI + yüksek funding = tehlike, yüksek OI + nötr funding = ok
+            if funding is not None and funding > 0.03:
+                s = 30; neg.append(f"OI ${oi:.1f}B + yüksek funding — Birikmiş kaldıraç riski")
+            else:
+                s = 48
+        else:
+            s = 22; neg.append(f"OI ${oi:.1f}B — Aşırı kaldıraç birikimi")
+        d_scores.append((s, 0.35))
+
+    long_liq  = _g("long_liquidations")
+    short_liq = _g("short_liquidations")
+    if long_liq is not None and short_liq is not None:
+        total_liq = long_liq + short_liq
+        long_dom  = long_liq / total_liq if total_liq > 0 else 0.5
+        if total_liq < 20:
+            s = 68; pos.append(f"Likidasyonlar düşük (${total_liq:.0f}M) — Kaldıraç dengeli")
+        elif total_liq < 80:
+            if long_dom > 0.65:
+                s = 38; neg.append(f"Long flush baskın (${long_liq:.0f}M / ${total_liq:.0f}M) — Downside stres")
+            elif long_dom < 0.35:
+                s = 65; pos.append(f"Short squeeze baskın (${short_liq:.0f}M) — Yukarı baskı")
+            else:
+                s = 55
+        else:
+            if long_dom > 0.65:
+                s = 18; neg.append(f"Ağır long flush (${long_liq:.0f}M) — Leverage Flush ⚠")
+            elif long_dom < 0.35:
+                s = 62; pos.append(f"Güçlü short squeeze (${short_liq:.0f}M)")
+            else:
+                s = 35; neg.append(f"Yoğun çift taraflı tasfiye (${total_liq:.0f}M) — Oynaklık riski")
+        d_scores.append((s, 0.35))
+    elif long_liq is not None:
+        if long_liq > 150:
+            s = 20; neg.append(f"Long liquidation yüksek (${long_liq:.0f}M) — Long flush")
+        elif long_liq > 50:
+            s = 40; neg.append(f"Long liquidation orta (${long_liq:.0f}M)")
+        else:
+            s = 65
+        d_scores.append((s, 0.35))
+    elif short_liq is not None:
+        if short_liq > 150:
+            s = 72; pos.append(f"Short liquidation yüksek (${short_liq:.0f}M) — Short squeeze")
+        elif short_liq > 50:
+            s = 60
+        else:
+            s = 55
+        d_scores.append((s, 0.35))
+
+    layer_d = int(round(sum(s * w for s, w in d_scores) / sum(w for _, w in d_scores))) if d_scores else 50
+
+    # ── Katman E: Institutional Demand — 20% ──────────────────────────────
+    # İç ağırlıklar: ETF Flow 55%, Coinbase Premium 45%
+    e_scores: list[tuple[float, float]] = []
+
+    etf_flow = _g("etf_flow_cumulative")
+    if etf_flow is not None:
+        if etf_flow > 70:
+            s = 88; pos.append(f"Kümülatif ETF akışı ${etf_flow:.1f}B — Güçlü kurumsal birikim")
+        elif etf_flow > 45:
+            s = 72; pos.append(f"Kümülatif ETF akışı ${etf_flow:.1f}B — Pozitif kurumsal talep")
+        elif etf_flow > 20:
+            s = 52
+        elif etf_flow > 5:
+            s = 35; neg.append(f"Kümülatif ETF akışı ${etf_flow:.1f}B — Kurumsal talep zayıf")
+        else:
+            s = 18; neg.append(f"Kümülatif ETF akışı ${etf_flow:.1f}B — ETF ilgisi çok düşük")
+        e_scores.append((s, 0.55))
+
+    cb_prem = _g("coinbase_premium")
+    if cb_prem is not None:
+        if cb_prem > 0.10:
+            s = 85; pos.append(f"Coinbase premium {cb_prem:+.4f} — Güçlü ABD kurumsal alımı")
+        elif cb_prem > 0.01:
+            s = 68; pos.append(f"Coinbase premium {cb_prem:+.4f} — Pozitif ABD spot talebi")
+        elif cb_prem >= -0.05:
+            s = 50
+        elif cb_prem >= -0.15:
+            s = 32; neg.append(f"Coinbase premium {cb_prem:+.4f} — ABD satımı")
+        else:
+            s = 15; neg.append(f"Coinbase premium {cb_prem:+.4f} — Güçlü ABD satış baskısı")
+        e_scores.append((s, 0.45))
+
+    layer_e = int(round(sum(s * w for s, w in e_scores) / sum(w for _, w in e_scores))) if e_scores else 50
+
+    # ── Ana Skor ──────────────────────────────────────────────────────────
+    layer_scores = {
+        "valuation":     layer_a,
+        "holder":        layer_b,
+        "exchange":      layer_c,
+        "derivatives":   layer_d,
+        "institutional": layer_e,
+    }
+
+    # Veri olan katmanlar ağırlıklı ortalama
+    weights = {"valuation": 0.25, "holder": 0.20, "exchange": 0.15, "derivatives": 0.20, "institutional": 0.20}
+    available = {k: v for k, v in layer_scores.items() if _has_layer_data(k, entry)}
+
+    if available:
+        total_w   = sum(weights[k] for k in available)
+        main_score = sum(layer_scores[k] * weights[k] for k in available) / total_w
+    else:
+        main_score = 50.0
+
+    return max(0, min(100, int(round(main_score)))), layer_scores, pos, neg
+
+
+def _has_layer_data(layer: str, entry: dict) -> bool:
+    """Katmanda en az bir metrik girilmiş mi?"""
+    layer_keys = {
+        "valuation":     ["nupl", "mvrv", "mvrv_z_score", "realized_price"],
+        "holder":        ["sth_cost_basis", "lth_cost_basis", "sopr", "sth_rpl"],
+        "exchange":      ["exchange_netflow", "exchange_reserve"],
+        "derivatives":   ["funding_rate", "open_interest", "long_liquidations", "short_liquidations"],
+        "institutional": ["coinbase_premium", "etf_flow_cumulative"],
+    }
+    return any(get_metric_safe(entry, k) is not None for k in layer_keys.get(layer, []))
+
+
+def _compute_risk_flags(entry: dict) -> list[tuple[str, str]]:
+    """
+    BCRM-14 Risk Bayrakları.
+    Döndürür: [(bayrak_adı, renk_css_var), ...]
+    """
+    def _g(k: str) -> Optional[float]:
+        return get_metric_safe(entry, k)
+
+    flags: list[tuple[str, str]] = []
+    funding   = _g("funding_rate")
+    oi        = _g("open_interest")
+    long_liq  = _g("long_liquidations")
+    short_liq = _g("short_liquidations")
+    ex_net    = _g("exchange_netflow")
+    etf_flow  = _g("etf_flow_cumulative")
+    cb_prem   = _g("coinbase_premium")
+    nupl      = _g("nupl")
+    mvrv      = _g("mvrv")
+    mvrv_z    = _g("mvrv_z_score")
+    sopr      = _g("sopr")
+    sth_rpl   = _g("sth_rpl")
+    sth_cb    = _g("sth_cost_basis")
+    lth_cb    = _g("lth_cost_basis")
+
+    # Derivatives
+    if funding and oi and funding > 0.04 and oi > 25:
+        flags.append(("Long Overcrowding Risk", "var(--negative)"))
+    if funding and funding < -0.015 and sth_cb and lth_cb and sth_cb > lth_cb * 0.95:
+        flags.append(("Short Squeeze Setup", "var(--positive)"))
+    if long_liq and short_liq and (long_liq + short_liq) > 0:
+        if long_liq / (long_liq + short_liq) > 0.70 and (long_liq + short_liq) > 80:
+            flags.append(("Leverage Flush ⚠", "var(--negative)"))
+        if short_liq / (long_liq + short_liq) > 0.70 and (long_liq + short_liq) > 80:
+            flags.append(("Short Squeeze Active", "var(--positive)"))
+
+    # Exchange
+    if ex_net and ex_net > 3000:
+        flags.append(("Exchange Inflow Stress", "var(--negative)"))
+
+    # Institutional
+    if etf_flow and cb_prem and etf_flow < 20 and cb_prem < -0.05:
+        flags.append(("Institutional Demand Weakness", "var(--negative)"))
+
+    # Holder stress
+    if sopr and sopr < 0.97 and sth_rpl and sth_rpl < -10:
+        flags.append(("Holder Stress / Capitulation", "var(--negative)"))
+    if sth_cb and lth_cb and sth_cb < lth_cb * 0.95:
+        flags.append(("STH Cost Basis Pressure", "var(--negative)"))
+
+    # Overheated
+    if nupl and nupl > 0.70:
+        flags.append(("Overheated Valuation — NUPL", "var(--warning)"))
+    if mvrv and mvrv > 3.0:
+        flags.append(("Overheated Valuation — MVRV", "var(--warning)"))
+    if mvrv_z and mvrv_z > 6:
+        flags.append(("Overheated Valuation — Z-Score", "var(--warning)"))
+
+    return flags
+
+
+# ─── Geçmiş kayıt tablosu ────────────────────────────────────────────────────
+
+def _render_history_table() -> None:
+    """Kayıtlı tüm günlük girişleri tablo olarak göster."""
+    all_entries = load_all_entries()
+    if not all_entries:
+        st.info("Henüz kayıtlı on-chain veri yok.")
+        return
+
+    rows = []
+    for dt_key in sorted(all_entries.keys(), reverse=True):
+        e = all_entries[dt_key]
+        rows.append({
+            "Tarih":           dt_key,
+            "NUPL":            f"{e['nupl']:.4f}"         if e.get("nupl")            is not None else "—",
+            "SOPR":            f"{e['sopr']:.4f}"         if e.get("sopr")            is not None else "—",
+            "MVRV":            f"{e['mvrv']:.4f}"         if e.get("mvrv")            is not None else "—",
+            "MVRV Z":          f"{e['mvrv_z_score']:.2f}" if e.get("mvrv_z_score")    is not None else "—",
+            "LTH Basis":       f"${e['lth_cost_basis']:,.0f}" if e.get("lth_cost_basis") else "—",
+            "STH Basis":       f"${e['sth_cost_basis']:,.0f}" if e.get("sth_cost_basis") else "—",
+            "Realized P.":     f"${e['realized_price']:,.0f}" if e.get("realized_price")  else "—",
+            "STH P&L":         f"{e['sth_rpl']:+.2f}%"    if e.get("sth_rpl")         is not None else "—",
+            "Netflow (BTC)":   f"{e['exchange_netflow']:+,.0f}" if e.get("exchange_netflow") is not None else "—",
+            "Reserve (BTC)":   f"{e['exchange_reserve']:,.0f}" if e.get("exchange_reserve") else "—",
+            "Funding":         f"{e['funding_rate']:+.4f}%" if e.get("funding_rate")   is not None else "—",
+            "OI ($B)":         f"{e['open_interest']:.2f}"  if e.get("open_interest")  is not None else "—",
+            "Long Liq ($M)":   f"{e['long_liquidations']:.1f}"  if e.get("long_liquidations")  is not None else "—",
+            "Short Liq ($M)":  f"{e['short_liquidations']:.1f}" if e.get("short_liquidations") is not None else "—",
+            "CB Premium":      f"{e['coinbase_premium']:+.4f}" if e.get("coinbase_premium") is not None else "—",
+            "ETF ($B)":        f"{e['etf_flow_cumulative']:.1f}" if e.get("etf_flow_cumulative") is not None else "—",
+            "Kaydedildi":      e.get("_saved_at", "?")[:16],
+        })
+
+    df_hist = pd.DataFrame(rows)
+    st.dataframe(df_hist, use_container_width=True, hide_index=True)
+
+
 # ─── Main render function ─────────────────────────────────────────────────────
 
 def render_onchain_tab() -> None:
     """
     Main entry point called from app.py.
     Renders the full ON-CHAIN DASHBOARD tab.
+    Manuel Mod / Coin Metrics Mod toggle ile çalışır.
     """
     st.markdown(
         '<div class="s-kicker">On-Chain Intelligence</div>'
         '<div class="s-title">ON-CHAIN DASHBOARD</div>'
         '<div class="s-subtitle">'
-        'Coin Metrics günlük CSV verilerinden türetilmiş BTC on-chain / valuation / '
-        'exchange / miner / network metrikleri. Veriler günlük frekansta güncellenir.'
+        'Manuel girdi modu: CryptoQuant / Glassnode değerlerini sidebar\'dan girin. '
+        'Coin Metrics modu: GitHub CSV (2 haftadır güncelleme almayabilir).'
         '</div>',
         unsafe_allow_html=True,
     )
     st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
 
-    # ── Refresh control ───────────────────────────────────────────────────
+    # ── Mod seçici ────────────────────────────────────────────────────────
+    mode_col, info_col = st.columns([0.4, 0.6])
+    with mode_col:
+        use_manual = st.toggle(
+            "📊 Manuel Mod",
+            value=True,
+            help="Aktif: CryptoQuant/Glassnode değerlerini sidebar'dan gir. "
+                 "Pasif: Coin Metrics GitHub CSV (güncel olmayabilir).",
+            key="onchain_manual_mode",
+        )
+    with info_col:
+        if use_manual:
+            today_ok = has_today_entry()
+            latest   = load_latest_entry()
+            latest_date = None
+            if latest:
+                # en son kayıt tarihini bul
+                all_e = load_all_entries()
+                latest_date = max(all_e.keys()) if all_e else None
+            badge_color = "var(--positive)" if today_ok else "var(--warning)"
+            badge_text  = "Bugün girildi ✓" if today_ok else "Bugün veri yok"
+            st.markdown(
+                f"<div style='font-family:var(--font-mono);font-size:0.68rem;"
+                f"color:{badge_color};padding-top:8px'>"
+                f"{badge_text}"
+                f"{'  ·  Son kayıt: ' + latest_date if latest_date else ''}"
+                f"  ·  Toplam: {entry_count()} gün"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+
+    st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
+
+    # ─────────────────────────────────────────────────────────────────────
+    # MANUEL MOD
+    # ─────────────────────────────────────────────────────────────────────
+    if use_manual:
+        _render_manual_sidebar_form()
+
+        latest_entry = load_latest_entry()
+        if latest_entry is None:
+            st.info(
+                "Henüz on-chain veri girilmedi. Sol sidebar'daki formu kullanarak "
+                "bugünün metriklerini kaydedin."
+            )
+            return
+
+        _render_manual_dashboard(latest_entry)
+
+        # Geçmiş kayıtlar
+        st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
+        with st.expander(f"📅 Geçmiş Kayıtlar ({entry_count()} gün)", expanded=False):
+            _render_history_table()
+
+        # Footer
+        st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
+        st.markdown(
+            "<div style='font-size:0.7rem;color:var(--text-faint);line-height:1.6;"
+            "padding:10px 14px;border-radius:6px;border:1px solid var(--border-soft);"
+            "background:rgba(255,255,255,0.01)'>"
+            "Manuel Mod: Değerler CryptoQuant / Glassnode / Coinglass gibi kaynaklardan "
+            "elle girilmiştir. Skor ve driver listesi bu değerlerden hesaplanmıştır. "
+            "Bu sayfa finansal tavsiye içermez."
+            "</div>",
+            unsafe_allow_html=True,
+        )
+        return
+
+    # ─────────────────────────────────────────────────────────────────────
+    # COIN METRICS MODU (mevcut davranış)
+    # ─────────────────────────────────────────────────────────────────────
     ctrl_col, _ = st.columns([0.3, 0.7])
     with ctrl_col:
         force_refresh = st.button(
@@ -962,7 +1899,6 @@ def render_onchain_tab() -> None:
             use_container_width=True,
         )
 
-    # ── Load data (cached unless force_refresh) ───────────────────────────
     with st.spinner("On-chain veriler hazırlanıyor…"):
         try:
             oc, btc_r, usdt_r, usdc_r, df_computed = _load_and_compute(
@@ -972,7 +1908,6 @@ def render_onchain_tab() -> None:
             st.error(f"On-chain veri yüklenirken hata: {exc}")
             return
 
-    # ── Source status bar ─────────────────────────────────────────────────
     btc_status = btc_r.source_status
     status_html = (
         f"<div style='display:flex;align-items:center;gap:10px;flex-wrap:wrap;"
@@ -993,16 +1928,14 @@ def render_onchain_tab() -> None:
     )
     st.markdown(status_html, unsafe_allow_html=True)
 
-    # Missing column warnings (compact)
     all_missing = btc_r.missing_columns + usdt_r.missing_columns + usdc_r.missing_columns
     if all_missing:
         st.warning(f"Bazı kolonlar eksik: {', '.join(all_missing)}")
 
-    # ── UNAVAILABLE guard ─────────────────────────────────────────────────
     if oc.regime == "UNAVAILABLE":
         st.error(
             "On-chain veri şu an mevcut değil. GitHub erişimi başarısız "
-            "ve lokal cache de bulunamadı. Tekrar denemek için 'Veriyi Yenile' butonunu kullan."
+            "ve lokal cache de bulunamadı. Manuel Mod'u aktifleştirerek devam edebilirsin."
         )
         if oc.warnings:
             with st.expander("Teknik Detaylar", expanded=False):
@@ -1010,28 +1943,20 @@ def render_onchain_tab() -> None:
                     st.caption(f"⚠ {w}")
         return
 
-    # ── Panels ────────────────────────────────────────────────────────────
     _render_overview_panel(oc, btc_status, btc_r.latest_date)
-
     st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
     _render_valuation_panel(oc, df_computed)
-
     st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
     _render_exchange_panel(oc, df_computed)
-
     st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
     _render_miner_network_panel(oc, df_computed)
-
     st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
     _render_stablecoin_panel(oc, usdt_r, usdc_r, df_computed)
-
     st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
     _render_charts_section(df_computed)
-
     st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
     _render_driver_summary(oc)
 
-    # ── Footer disclaimer ─────────────────────────────────────────────────
     st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
     st.markdown(
         "<div style='font-size:0.7rem;color:var(--text-faint);line-height:1.6;"
