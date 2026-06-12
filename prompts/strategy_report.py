@@ -174,14 +174,26 @@ def _format_stock_fng(data: dict) -> str:
     sfng_vix = data.get("STOCK_FNG_VIX", "-")
     sfng_mom = data.get("STOCK_FNG_MOM", "-")
     sfng_brd = data.get("STOCK_FNG_BRD", "-")
+    sfng_source = data.get("STOCK_FNG_SOURCE", "-")
     crypto_fng = data.get("FNG", "-")
+    crypto_fng_prev = data.get("FNG_PREV", "-")
+
+    # Crypto F&G satırı
+    if crypto_fng_prev and crypto_fng_prev != "-":
+        crypto_line = f"- Crypto F&G: {crypto_fng} | Dün: {crypto_fng_prev}"
+    else:
+        crypto_line = f"- Crypto F&G: {crypto_fng}"
+
+    # Stock F&G satırı
     if sfng == "-":
-        return f"- Stock F&G: veri yok | Crypto F&G: {crypto_fng}"
-    return (
-        f"- Stock Market F&G: {sfng}\n"
-        f"  VIX bileşeni: {sfng_vix}/100 | Momentum: {sfng_mom}/100 | Breadth: {sfng_brd}/100\n"
-        f"- Crypto F&G: {crypto_fng}"
-    )
+        stock_line = f"- Stock Market F&G: veri yok"
+    else:
+        stock_line = (
+            f"- Stock Market F&G: {sfng} (Kaynak: {sfng_source})\n"
+            f"  VIX bileşeni: {sfng_vix}/100 | Momentum: {sfng_mom}/100 | Breadth: {sfng_brd}/100"
+        )
+
+    return f"{crypto_line}\n{stock_line}"
 
 
 def build_strategy_report_prompt(
@@ -239,6 +251,7 @@ Zorunlu cikti formati:
 ### BTC, Türev ve Order Book Analizi
 ### ETF, Stablecoin ve Altcoinler
 ### Macro Breadth ve Crypto Breadth
+### Sentiment — Korku & Açgözlülük Endeksleri
 ### Ekonomik Takvim ve Olası Etkiler
 ### Önemli Haberler ve Piyasa Yorumu
 ### Long / Short / Bekle ve Kritik Riskler
@@ -362,6 +375,7 @@ Ek kurallar:
 - "Makro Ortam ve Risk İştahı" bolumunde Global Risk On/Off sinyalini (phase, side bias, playbook) ve cross-asset transmission sonuclarini (ETH/BTC, BTC/NQ, BTC/GOLD) somut yorumla kullan.
 - "Günlük Harita ve Ana Çıkarım" bolumunde MQS ve EWS skorlarini karar algilamasina bagla: piyasa kalitesi yuksekse agresiflik, dusukse temkin vurgulansin.
 - Stock Market Fear & Greed ve Crypto Fear & Greed verilerini sentiment konfirmasyonu olarak kullan; iki endeks arasindan ayrisma varsa bunu belirt.
+- "Sentiment — Korku & Açgözlülük Endeksleri" ZORUNLU bir bolum olup her bultende mutlaka yer almalidir. Bu bolumde Crypto F&G (Alternative.me) ve Stock Market F&G (CNN/VIX kompozit) endekslerini AYRI AYRI belirt: her biri icin tam sayisal degeri, kategorisini (Extreme Fear / Fear / Neutral / Greed / Extreme Greed) ve varsa bir onceki gune gore degisimi yaz. Iki endeks arasinda ayrisma varsa (ornegin biri Extreme Fear, digeri Neutral veya Greed) bunu ozellikle vurgula ve olasi anlami uzerine bir cumle ekle. Bu bolumde hicbir zaman sadece genel bir cumleyle gecme; somut sayilar zorunludur.
 - Karar Motoru'ndaki (EVET/DIKKAT/HAYIR) sonucu "Long/Short/Bekle" bolumune dogal dille entegre et; skoru aynen kopyalama.
 - "Makro Ortam ve Risk İştahı" bolumundeki HER metrik (VIX, DXY, US10Y, SP500, NASDAQ, DAX, NIKKEI, GOLD, SILVER, OIL) icin hem fiyat/seviye hem de 24s degisim yuzdesini birlikte yaz. Sadece degisim veya sadece fiyat yazmak yasaktir; her metrik "X seviyesinde, 24 saatte %Y degisim" formatinda olmali.
 - "Ekonomik Takvim ve Olası Etkiler" bolumunde veri etiketine dikkat et: [AÇIKLANDI] etiketi tasiyan olaylar icin gerceklesen rakamlar beklentinin uzerinde mi altinda mi kaldi, piyasaya etkisi ne oldu tonunda yaz. [HENÜZ AÇIKLANMADI] etiketi tasiyan olaylar icin olasi senaryolar ve beklentiler uzerinden yaz. Hic bir durumda aciklanmis bir veri icin "aciklanacak" veya "bekleniyor" gibi ifadeler kullanma.
