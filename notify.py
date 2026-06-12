@@ -153,6 +153,8 @@ def save_report_to_disk(report: dict, context: dict, config: RuntimeConfig, now:
             "etf_flow":     _safe(context["data"].get("ETF_FLOW_TOTAL")),
             "funding":      _safe(context["data"].get("FR")),
             "fng":          _safe(context["data"].get("FNG")),
+            "fng_prev":     _safe(context["data"].get("FNG_PREV")),
+            "stock_fng":    _safe(context["data"].get("STOCK_FNG")),
         },
         "report": {
             "terminal_report": report.get("terminal_report", ""),
