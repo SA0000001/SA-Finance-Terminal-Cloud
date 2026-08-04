@@ -12,6 +12,7 @@ import requests
 import streamlit as st
 import streamlit.runtime as st_runtime
 import yfinance as yf
+from bs4 import BeautifulSoup
 
 from domain.parsers import parse_number
 from domain.signals import build_orderbook_signal, clear_wall_levels, extract_wall_levels, save_wall_levels
@@ -27,6 +28,23 @@ ETF_FLOW_LAYOUTS = (
 ETF_PLACEHOLDERS = {"", "-", "—"}
 PLACEHOLDER = "—"
 TEXT_ACCEPT = "text/plain, text/markdown, */*"
+HTML_ACCEPT = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+# r.jina.ai artık API key'siz istekleri agresif rate-limit'liyor ("lowest-trust pool"),
+# bu yüzden birincil kaynak olarak farside.co.uk'u DOĞRUDAN (gerçekçi tarayıcı header'larıyla)
+# deniyoruz; r.jina.ai sadece yedek (Cloudflare vb. engellerse) olarak kalıyor.
+FARSIDE_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    ),
+    "Accept-Language": "en-US,en;q=0.9",
+}
+FARSIDE_FLOW_SOURCES = (
+    ("https://farside.co.uk/bitcoin-etf-flow-all-data/", HTML_ACCEPT),
+    ("https://farside.co.uk/btc/", HTML_ACCEPT),
+    ("https://r.jina.ai/http://farside.co.uk/bitcoin-etf-flow-all-data/", TEXT_ACCEPT),
+    ("https://r.jina.ai/http://farside.co.uk/btc/", TEXT_ACCEPT),
+)
 DATA_PARSE_EXCEPTIONS = (KeyError, TypeError, ValueError, IndexError, ZeroDivisionError)
 YFINANCE_EXCEPTIONS = (KeyError, TypeError, ValueError, IndexError, requests.RequestException)
 FAST_TTL = 30
@@ -580,6 +598,9 @@ def build_etf_flow_df(data):
 
 def _clean_etf_flow_cell(value):
     text = str(value or "").replace("\xa0", " ").strip()
+    # r.jina.ai markdown genelde "-" kullanır; ham HTML kaynaklarda en dash (–)
+    # veya minus sign (−) görülebilir — hepsini tek bir placeholder biçimine indirger.
+    text = text.replace("\u2013", "-").replace("\u2212", "-")
     return re.sub(r"\s+", " ", text)
 
 
@@ -653,8 +674,42 @@ def _parse_latest_etf_flow_flat_row(flow_text):
     return parsed_rows[-1] if parsed_rows else None
 
 
+def _parse_latest_etf_flow_html_row(flow_text):
+    """farside.co.uk sayfasının ham HTML'ini (r.jina.ai olmadan, doğrudan fetch)
+    parse eder. r.jina.ai markdown/flat text döndürürken, doğrudan istek gerçek
+    <table> HTML'i döndürür — bu nedenle diğer iki parser bu formatı yakalayamaz.
+    """
+    if "<table" not in flow_text.lower():
+        return None
+    try:
+        soup = BeautifulSoup(flow_text, "html.parser")
+    except Exception:
+        return None
+
+    dated_rows = []
+    for table in soup.find_all("table"):
+        for row in table.find_all("tr"):
+            cells = [_clean_etf_flow_cell(cell.get_text()) for cell in row.find_all(["td", "th"])]
+            if len(cells) < 2 or not ETF_FLOW_DATE_RE.match(cells[0]):
+                continue
+            dated_rows.append(cells)
+
+    for cells in reversed(dated_rows):
+        date_text = cells[0]
+        values = _resolve_etf_flow_values(cells[1:])
+        if not values or not _has_populated_etf_values(values):
+            continue
+        return date_text, values
+
+    return None
+
+
 def parse_latest_etf_flow_row(flow_text):
-    return _parse_latest_etf_flow_pipe_row(flow_text) or _parse_latest_etf_flow_flat_row(flow_text)
+    return (
+        _parse_latest_etf_flow_pipe_row(flow_text)
+        or _parse_latest_etf_flow_html_row(flow_text)
+        or _parse_latest_etf_flow_flat_row(flow_text)
+    )
 
 
 def format_market_cap_short(value):
@@ -1347,13 +1402,11 @@ def _legacy_veri_motoru(fred_api_key=""):
     data["ETF_FLOW_SOURCE"] = PLACEHOLDER
 
     flow_failures = []
-    for flow_url in [
-        "https://r.jina.ai/http://farside.co.uk/bitcoin-etf-flow-all-data/",
-        "https://r.jina.ai/http://farside.co.uk/btc/",
-        "https://farside.co.uk/bitcoin-etf-flow-all-data/",
-    ]:
+    for flow_url, flow_accept in FARSIDE_FLOW_SOURCES:
         try:
-            response = safe_fetch_text("Farside ETF Flow", flow_url, timeout=20, headers=HEADERS, accept=TEXT_ACCEPT)
+            response = safe_fetch_text(
+                "Farside ETF Flow", flow_url, timeout=20, headers=FARSIDE_HEADERS, accept=flow_accept
+            )
             latest_row = parse_latest_etf_flow_row(response.payload)
             if not latest_row:
                 raise ValueError("No populated ETF flow row found")
@@ -1365,9 +1418,9 @@ def _legacy_veri_motoru(fred_api_key=""):
             health.success("Farside ETF Flow", response.latency_ms, stale_after_seconds=43200)
             break
         except FetchError as exc:
-            flow_failures.append(str(exc))
+            flow_failures.append(f"{flow_url}: {exc}")
         except (TypeError, ValueError) as exc:
-            flow_failures.append(_error_message("Parse error", exc))
+            flow_failures.append(_error_message(f"{flow_url}: Parse error", exc))
     else:
         health.failure(
             "Farside ETF Flow",
@@ -1989,13 +2042,11 @@ def _fetch_market_snapshot():
     data["ETF_FLOW_DATE"] = PLACEHOLDER
     data["ETF_FLOW_SOURCE"] = PLACEHOLDER
     flow_failures = []
-    for flow_url in [
-        "https://r.jina.ai/http://farside.co.uk/bitcoin-etf-flow-all-data/",
-        "https://r.jina.ai/http://farside.co.uk/btc/",
-        "https://farside.co.uk/bitcoin-etf-flow-all-data/",
-    ]:
+    for flow_url, flow_accept in FARSIDE_FLOW_SOURCES:
         try:
-            response = safe_fetch_text("Farside ETF Flow", flow_url, timeout=20, headers=HEADERS, accept=TEXT_ACCEPT)
+            response = safe_fetch_text(
+                "Farside ETF Flow", flow_url, timeout=20, headers=FARSIDE_HEADERS, accept=flow_accept
+            )
             latest_row = parse_latest_etf_flow_row(response.payload)
             if not latest_row:
                 raise ValueError("No populated ETF flow row found")
@@ -2006,9 +2057,9 @@ def _fetch_market_snapshot():
             health.success("Farside ETF Flow", response.latency_ms, stale_after_seconds=43200)
             break
         except FetchError as exc:
-            flow_failures.append(str(exc))
+            flow_failures.append(f"{flow_url}: {exc}")
         except (TypeError, ValueError) as exc:
-            flow_failures.append(_error_message("Parse error", exc))
+            flow_failures.append(_error_message(f"{flow_url}: Parse error", exc))
     else:
         health.failure(
             "Farside ETF Flow", "; ".join(flow_failures) or "ETF flow source unavailable", stale_after_seconds=43200
